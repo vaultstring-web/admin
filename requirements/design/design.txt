@@ -1,0 +1,148 @@
+DESIGN SYSTEM FOUNDATION
+1. Core Color Palette
+Brand Colors
+
+Primary Green
+Hex: #448a33
+Role: Primary actions, confirmations, growth indicators
+Light Mode: Used as-is for buttons, highlights, active states
+Dark Mode: Lightened semantic variant to preserve contrast on dark surfaces
+
+Primary Blue
+Hex: #3b5a65
+Role: Secondary actions, navigation accents, informational elements
+Light Mode: Used for secondary buttons, links, charts
+Dark Mode: Lightened semantic variant for readability on dark backgrounds
+
+Both brand colors must maintain WCAG 2.1 AA contrast compliance against background and surface colors in both themes.
+
+Semantic Color System
+
+All semantic colors must exist as role-based tokens rather than raw hex usage.
+
+Success
+Purpose: Confirmations, completed states, positive feedback
+Light Mode: Derived from Primary Green with reduced chroma
+Dark Mode: Higher lightness variant to avoid dullness on dark surfaces
+
+Error
+Purpose: Destructive actions, validation failures
+Light Mode: Red derivative with sufficient contrast on white
+Dark Mode: Softer red with higher lightness to reduce eye strain
+
+Warning
+Purpose: Risk alerts, cautionary states
+Light Mode: Yellow or amber derivative with dark foreground
+Dark Mode: Muted amber with light foreground text
+
+Info
+Purpose: Informational banners, tooltips, neutral notices
+Light Mode: Derived from Primary Blue
+Dark Mode: Elevated lightness blue to separate from background
+
+Neutral Palette
+
+Neutrals are semantic and scale-based, not named by color.
+
+Light Mode Neutral Scale
+Near-white background
+Surface white
+Light gray border
+Mid gray muted text
+Dark gray foreground
+
+Dark Mode Neutral Scale
+Near-black background
+Dark surface
+Dark gray border
+Mid gray muted text
+Near-white foreground
+
+Each neutral step must be tested for contrast against adjacent roles such as text, icons, and dividers.
+
+2. Dark Mode Strategy
+
+Dark mode is semantic, not inverted.
+
+Backgrounds become low-light neutral surfaces
+Text becomes near-white with softened contrast
+Brand colors shift toward higher lightness and moderate chroma
+Borders and dividers rely on opacity and subtle contrast
+Charts use adjusted brand hues to prevent color vibration
+
+No pure black or pure white is allowed in dark mode to reduce eye fatigue.
+
+3. Typography Scale
+Font Family
+
+Primary Sans Serif
+Recommended: Inter or Manrope
+Fallback: System UI stack
+
+Optional Monospace
+Use for data, code, identifiers
+
+Fonts must support clear numerals and financial data readability.
+
+Type Hierarchy
+
+H1: Page-level headlines
+H2: Section headers
+H3: Subsections
+H4 to H6: Supporting hierarchy
+
+Body: Primary reading text
+Small: Secondary text, metadata
+Caption: Labels, helper text
+Button: Medium weight, slightly increased letter spacing
+Label: Medium weight, compact line height
+
+Weights
+
+Regular
+Medium
+Semibold
+Bold
+
+Avoid excessive weight jumps between hierarchy levels.
+
+Line Heights
+
+Headings: Tight but readable
+Body: Comfortable for long-form reading
+Small text: Slightly increased for legibility
+
+Line heights should adapt responsively on smaller screens.
+
+4. Spacing System
+Base Unit
+
+Base spacing unit: 4px or 8px grid
+All spacing tokens must be multiples of the base unit
+
+Spacing Scale
+
+xs
+sm
+md
+lg
+xl
+2xl
+3xl
+
+Used consistently across padding, margin, gaps, and layout rhythm.
+
+Layout Usage
+
+Container padding scales by breakpoint
+Grid gaps follow spacing scale
+Section margins use lg to 2xl spacing
+Card padding uses md to lg spacing
+
+Whitespace is treated as a primary design element, especially in fintech contexts where clarity and trust are critical.
+
+5. Implementation Principle
+
+All colors, typography, and spacing must be referenced via tokens or CSS variables. No hardcoded values are allowed in components.
+
+Light mode and dark mode must be fully interchangeable without changing component logic.

@@ -1,0 +1,150 @@
+TRANSACTION MONITORING SPECIFICATION
+1. Purpose
+
+The Transaction Monitoring module provides administrators with real-time and historical visibility into all financial transactions on the platform. It supports operational oversight, dispute investigation, fraud detection, and regulatory compliance.
+
+2. Target Users
+
+Operations team
+Risk and fraud analysts
+Compliance officers
+Finance and settlement staff
+
+Access must be governed by role-based permissions.
+
+3. Core Objectives
+
+Enable fast discovery of specific transactions
+Provide comprehensive transaction context for investigations
+Support fraud detection through filtering and flagging
+Ensure traceability and auditability of transaction activity
+
+4. Information Architecture
+
+The Transaction Monitoring section consists of:
+
+Transaction List View
+Transaction Detail View
+
+Navigation must preserve applied filters and date ranges.
+
+5. Transaction List View
+Purpose
+
+Provide a scalable, filterable overview of all transactions.
+
+Transaction Table
+
+Each row represents a single transaction and must display:
+
+Transaction ID
+
+Customer or merchant identifier
+
+Transaction amount
+
+Currency (MWK or CNY)
+
+Transaction status
+
+Date and time
+
+Primary action entry point
+
+Filters
+
+Filters must be combinable and applied consistently.
+
+User Filter
+Filter by:
+
+Customer
+
+Merchant
+
+Supports lookup by name or ID.
+
+Status Filter
+Pending
+Completed
+Failed
+
+Date Range Filter
+Custom start and end dates
+Predefined ranges such as today, last 7 days, last 30 days
+
+Currency Filter
+MWK
+CNY
+
+Sorting
+
+Default sort order is most recent transactions first.
+Optional sorting by date, amount, or status.
+
+6. Transaction Detail View
+Purpose
+
+Provide full visibility into a specific transaction.
+
+Transaction Information
+
+Transaction ID
+Customer or merchant details
+Amount and currency
+Applied exchange rate where relevant
+Transaction status and lifecycle timestamps
+
+System Metadata
+
+Payment channel or method
+Processing duration
+Error codes or failure reasons if applicable
+
+Administrative Actions
+
+View Full Details
+Includes all associated metadata and references.
+
+Flag as Suspicious
+Marks the transaction for review by risk or compliance teams.
+Requires a mandatory reason or note.
+
+Flagged transactions must be clearly labeled in the transaction list.
+
+7. Fraud and Risk Indicators
+
+Flagged transactions must trigger:
+
+Visual indicators in the UI
+
+Optional alerts to risk teams
+
+Inclusion in compliance reporting workflows
+
+Flagging must not alter transaction financial state unless escalated.
+
+
+8. Performance and Scalability
+
+The transaction list must handle high volumes with pagination or virtualization.
+Filtering and search must remain responsive at scale.
+Real-time updates must not degrade platform performance.
+
+9. Accessibility and Design Requirements
+
+All tables and controls must meet WCAG 2.1 AA standards.
+Status and risk indicators must include text labels in addition to color cues.
+Layout and visual hierarchy must follow the Design System Foundation.
+
+10. Data Integrity and Freshness
+
+Each transaction record must reflect the authoritative system of record.
+Last updated timestamps must be visible in the detail view.
+Fallback messaging must appear if data is delayed or unavailable.
+
+11. Success Criteria
+
+Administrators can locate and inspect transactions quickly.
+Suspicious activity is clearly identifiable and traceable.
+Transaction data is trusted, complete, and auditable.
