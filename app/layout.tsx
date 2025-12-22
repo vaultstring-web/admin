@@ -1,15 +1,24 @@
-import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Manrope } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { DashboardHeader } from "@/components/dashboard/header"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+})
 
-export const metadata = {
+const manrope = Manrope({ 
+  subsets: ["latin"],
+  variable: "--font-manrope", 
+  display: "swap",
+})
+
+export const metadata: Metadata = {
   title: "VaultString",
   description: "Cross border payment and wallet system",
   icons: {
@@ -17,8 +26,7 @@ export const metadata = {
     shortcut: "/icons/favicon.svg",
     apple: "/icons/favicon.svg",
   },
-};
-
+}
 
 export default function RootLayout({
   children,
@@ -29,8 +37,8 @@ export default function RootLayout({
   const isAuthPage = false // You can implement logic to check current route
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${manrope.variable}`}>
+      <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {isAuthPage ? (
             // Render auth pages without sidebar/header

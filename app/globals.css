@@ -99,8 +99,8 @@
 }
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-sans: var(--font-inter), var(--font-manrope), sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -137,6 +137,33 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Add your custom theme extensions */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-spin: spin 1s linear infinite;
+  
+  /* Add brand colors */
+  --color-brand-green: #448a33;
+  --color-brand-blue: #3b5a65;
+  
+  /* Add semantic colors */
+  --color-semantic-success-light: #448a33;
+  --color-semantic-success-dark: #5eb448;
+  --color-semantic-error-light: #dc2626;
+  --color-semantic-error-dark: #ef4444;
+  --color-semantic-warning-light: #d97706;
+  --color-semantic-warning-dark: #f59e0b;
+  --color-semantic-info-light: #3b5a65;
+  --color-semantic-info-dark: #527b8a;
+  
+  /* Add custom spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
 }
 
 @layer base {
@@ -146,4 +173,43 @@
   body {
     @apply bg-background text-foreground;
   }
+  code, pre {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace);
+  }
+}
+
+@layer utilities {
+  /* Custom spacing utilities */
+  .p-xs { padding: var(--spacing-xs); }
+  .p-sm { padding: var(--spacing-sm); }
+  .p-md { padding: var(--spacing-md); }
+  .p-lg { padding: var(--spacing-lg); }
+  .p-xl { padding: var(--spacing-xl); }
+  
+  .px-xs { padding-left: var(--spacing-xs); padding-right: var(--spacing-xs); }
+  .px-sm { padding-left: var(--spacing-sm); padding-right: var(--spacing-sm); }
+  .px-md { padding-left: var(--spacing-md); padding-right: var(--spacing-md); }
+  .px-lg { padding-left: var(--spacing-lg); padding-right: var(--spacing-lg); }
+  .px-xl { padding-left: var(--spacing-xl); padding-right: var(--spacing-xl); }
+  
+  .py-xs { padding-top: var(--spacing-xs); padding-bottom: var(--spacing-xs); }
+  .py-sm { padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm); }
+  .py-md { padding-top: var(--spacing-md); padding-bottom: var(--spacing-md); }
+  .py-lg { padding-top: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
+  .py-xl { padding-top: var(--spacing-xl); padding-bottom: var(--spacing-xl); }
+  
+  .gap-xs { gap: var(--spacing-xs); }
+  .gap-sm { gap: var(--spacing-sm); }
+  .gap-md { gap: var(--spacing-md); }
+  .gap-lg { gap: var(--spacing-lg); }
+  .gap-xl { gap: var(--spacing-xl); }
+  
+  /* Brand color utilities */
+  .text-brand-green { color: var(--color-brand-green); }
+  .bg-brand-green { background-color: var(--color-brand-green); }
+  .border-brand-green { border-color: var(--color-brand-green); }
+  
+  .text-brand-blue { color: var(--color-brand-blue); }
+  .bg-brand-blue { background-color: var(--color-brand-blue); }
+  .border-brand-blue { border-color: var(--color-brand-blue); }
 }
