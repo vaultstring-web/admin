@@ -1,0 +1,159 @@
+DASHBOARD OVERVIEW SPECIFICATION
+1. Purpose
+
+The Dashboard Overview provides a real-time, high-level snapshot of platform performance, financial activity, and system reliability. It is the primary landing view for internal stakeholders and operators, enabling rapid situational awareness and early issue detection without requiring deep navigation.
+
+2. Target Users
+
+Operations team
+Finance and compliance staff
+Executive and management stakeholders
+Technical administrators
+
+Each user group must be able to interpret the dashboard within seconds of loading the page.
+
+3. Core Objectives
+
+Present critical KPIs in a clear and scannable layout
+Surface financial throughput and user growth trends
+Expose system health and uptime status
+Highlight urgent alerts and operational risks
+Provide visibility into foreign exchange rate status
+
+4. Information Architecture
+
+The dashboard is divided into clearly defined sections, ordered by operational priority.
+
+5. KPI Summary Section
+Purpose
+
+Provide immediate insight into platform scale and activity.
+
+Metrics
+
+Total Transactions
+Displayed as aggregated counts with selectable time ranges:
+
+Today
+
+Last 7 days
+
+Last 30 days
+
+Values should update in near real time where technically feasible.
+
+Total Users
+Split into:
+
+Customers
+
+Merchants
+
+Growth trend indicators should be displayed alongside absolute counts.
+
+Total Volume
+Displayed in:
+
+MWK
+
+CNY
+
+Conversion must reflect the latest approved forex rate at the time of calculation.
+
+6. System Health Section
+Purpose
+
+Expose infrastructure reliability and performance at a glance.
+
+Metrics
+
+System Uptime
+Displayed as a percentage over the last 24 hours and last 30 days.
+
+Performance Metrics
+Key indicators may include:
+
+Average API response time
+
+Transaction processing latency
+
+Error rate percentage
+
+Threshold breaches must visually signal degraded performance.
+
+7. Alerts and Notifications Section
+Purpose
+
+Surface operational risks and actionable events.
+
+Content
+
+Recent alerts ordered by severity and recency, including:
+
+Failed transactions
+
+Forex feed interruptions
+
+System errors or outages
+
+Security or compliance warnings
+
+Unread or critical alerts must be visually distinguished and persistent until acknowledged.
+
+8. Forex Rate Status Section
+Purpose
+
+Ensure transparency and trust in cross-currency operations.
+
+Content
+
+Current MWK/CNY Exchange Rate
+Displayed with timestamp of last update.
+
+Rate Status Indicator
+Clear state labels such as:
+
+Live
+
+Delayed
+
+Stale
+
+Unavailable
+
+Historical Context
+Optional short-term trend indicator to show recent movement direction.
+
+9. Data Freshness and Accuracy
+
+Each metric must indicate:
+
+Last updated timestamp
+
+Data source classification where relevant
+
+Fallback messaging must appear when data is unavailable or delayed.
+
+10. Interaction and Behavior Rules
+
+Time range filters must apply consistently across all relevant KPIs.
+Hover or click interactions may reveal metric definitions or breakdowns.
+Critical alerts must override nonessential dashboard content where necessary.
+
+11. Visual and Accessibility Requirements
+
+All data visualizations must comply with WCAG 2.1 AA contrast standards.
+Status indicators must not rely on color alone and must include text or icon cues.
+Typography and spacing must follow the established Design System Foundation.
+
+12. Non-Functional Requirements
+
+Initial dashboard load time must meet performance budgets.
+Real-time updates must not degrade system stability.
+The dashboard must gracefully handle partial service outages.
+
+13. Success Criteria
+
+Users can assess platform health within 5 seconds of viewing the dashboard.
+Critical issues are immediately visible without scrolling.
+Financial metrics are trusted, traceable, and consistent across systems.

@@ -1,0 +1,159 @@
+MERCHANTS MANAGEMENT SPECIFICATION
+1. Purpose
+
+The Merchants page provides administrators with structured oversight of all merchant accounts on the platform. It supports business verification, approval workflows, and ongoing risk and compliance management for entities processing transactions.
+
+2. Target Users
+
+Compliance and verification officers
+Operations team
+Risk and fraud analysts
+Finance and settlement administrators
+
+Access must be governed by role-based permissions.
+
+3. Core Objectives
+
+Maintain a complete registry of all merchant accounts
+Enable efficient merchant verification and approval workflows
+Provide clear visibility into business legitimacy and operational status
+Support regulatory compliance and transaction risk management
+
+4. Information Architecture
+
+The Merchants section consists of two primary views:
+
+Merchant List View
+Merchant Detail View
+
+Context such as filters and navigation state must be preserved between views.
+
+5. Merchant List View
+Purpose
+
+Provide a high-level, searchable overview of all registered merchants.
+
+Merchant Table
+
+Each row represents a merchant and must display:
+
+Business name
+
+Merchant ID
+
+Registration date
+
+Verification status
+
+Account status
+
+Primary action entry point
+
+Search and Filtering
+
+Search
+Supports lookup by:
+
+Business name
+
+Merchant ID
+
+Registered email or phone number
+
+Search must return results in near real time.
+
+Filters
+Available filters include:
+
+Verification status (pending, approved, rejected)
+
+Account status (active, suspended)
+
+Business category or industry
+
+Filters must be combinable.
+
+Sorting
+
+Default sort order is newest merchants first.
+Optional sorting by business name, registration date, or verification status.
+
+6. Merchant Detail View
+Purpose
+
+Provide a comprehensive view of a merchant’s business profile and verification state.
+
+Business Profile Section
+
+Business name and legal entity type
+Registration number and issuing authority
+Tax identification details where applicable
+Registered business address
+Primary contact person and contact details
+
+All fields must reflect the latest submitted and verified data.
+
+Verification and Compliance Section
+
+Submitted Documentation
+Business registration certificates
+Tax compliance documents
+Proof of address
+Authorized representative identification
+
+Verification Status
+Pending
+Approved
+Rejected
+
+Approval Workflow
+
+Approve Merchant
+Grants transactional and settlement privileges
+Requires confirmation and administrator authentication
+
+Reject Merchant
+Requires mandatory rejection reason
+May allow resubmission depending on policy
+
+All decisions must be logged with:
+
+Administrator identity
+
+Timestamp
+
+Decision reason
+
+7. Account Status Controls
+
+Active
+Merchant can process transactions normally.
+
+Suspended
+Transactions are blocked due to compliance or risk concerns.
+
+State changes must be immediate and fully auditable.
+
+
+8. Interaction and Safety Rules
+
+Approval and rejection actions require explicit confirmation.
+Bulk approvals are restricted or disabled.
+Rejected or suspended merchants must be clearly flagged across the system.
+
+9. Performance and Scalability
+
+Merchant lists must support large volumes with pagination or virtualization.
+Filtering and search must remain responsive under operational load.
+
+10. Accessibility and Design Requirements
+
+All interactive elements must meet WCAG 2.1 AA standards.
+Status indicators must include text labels in addition to color cues.
+Layouts must follow the Design System Foundation for spacing, typography, and color semantics.
+
+11. Success Criteria
+
+Administrators can quickly verify merchant legitimacy.
+Approval workflows are clear, controlled, and auditable.
+Risk actions are executed confidently and consistently.

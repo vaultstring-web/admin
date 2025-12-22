@@ -1,0 +1,156 @@
+FOREX RATE MANAGEMENT SPECIFICATION
+1. Purpose
+
+The Forex Rate Management module enables administrators to monitor, validate, and control foreign exchange rates used by the platform. It ensures transparency, accuracy, and governance over currency conversion, which is critical for financial integrity and regulatory compliance.
+
+2. Target Users
+
+Finance and treasury teams
+Compliance officers
+Risk management staff
+System administrators
+
+Access must be governed by role-based permissions.
+
+3. Core Objectives
+
+Provide real-time visibility into active exchange rates
+Maintain historical records for auditing and analysis
+Enable controlled manual intervention during rate disruptions
+Expose health and reliability of external rate sources
+
+4. Information Architecture
+
+The Forex Rate Management section consists of:
+
+Rate Overview View
+Rate History View
+Rate Control and Override Panel
+
+Navigation between views must preserve context.
+
+5. Rate Overview View
+Purpose
+
+Present the currently active exchange rate and its operational status.
+
+Core Content
+
+Current MWK/CNY Exchange Rate
+Displayed prominently with:
+
+Rate value
+
+Effective timestamp
+
+Source identifier
+
+Rate Status Indicator
+Clear state labels such as:
+
+Live
+
+Delayed
+
+Stale
+
+Unavailable
+
+Status must be visually and textually distinct.
+
+6. Historical Rate View
+Purpose
+
+Provide historical context and trend visibility.
+
+Historical Rate Chart
+
+Time-series chart displaying:
+
+Exchange rate values over time
+
+Selected date range
+
+Predefined ranges may include:
+
+24 hours
+
+7 days
+
+30 days
+
+Custom range
+
+Data granularity must adjust based on range selection.
+
+7. Rate Control and Override
+Purpose
+
+Allow controlled intervention when automated rate feeds fail or become unreliable.
+
+Manual Rate Override
+
+Administrators may input a temporary MWK/CNY rate.
+Override actions must require:
+
+Explicit confirmation
+
+Mandatory justification note
+
+Approval Workflow
+
+Manual overrides must follow a multi-step approval process:
+
+Initiation by authorized staff
+
+Review and approval by a separate approver role
+
+Once approved, the override becomes the active rate and is clearly labeled as manual.
+
+8. Rate Source Management
+Purpose
+
+Ensure transparency and redundancy in rate sourcing.
+
+Supported Sources
+
+RBM
+PBOC
+Approved third-party aggregators
+
+Source Status Indicators
+
+Each source must display:
+
+Availability state
+
+Last successful update time
+
+Error or latency indicators
+
+Source failures must trigger alerts.
+
+
+9. Interaction and Safety Rules
+
+Manual overrides cannot bypass approval workflow.
+Only one active override may exist at a time.
+Reverting to automated rates must be an explicit action.
+
+10. Performance and Reliability
+
+Rate updates must propagate consistently across the platform.
+Historical charts must load efficiently even for long ranges.
+Fallback logic must activate automatically when primary sources fail.
+
+11. Accessibility and Design Requirements
+
+Charts and controls must meet WCAG 2.1 AA standards.
+Status indicators must not rely on color alone.
+All layouts must conform to the Design System Foundation.
+
+12. Success Criteria
+
+Exchange rates are trusted and transparent.
+Manual interventions are controlled, auditable, and rare.
+Source failures are visible before impacting transactions.

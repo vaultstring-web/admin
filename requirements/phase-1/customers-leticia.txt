@@ -1,0 +1,162 @@
+1. Purpose
+
+The Customers page provides administrators and compliance officers with full visibility and control over customer accounts. It enables identity verification management, account status enforcement, and detailed customer inspection in support of regulatory compliance, fraud prevention, and operational oversight.
+
+2. Target Users
+
+Compliance and KYC officers
+Operations team
+Risk and fraud analysts
+System administrators
+
+Access must be restricted based on role and permission level.
+
+3. Core Objectives
+
+Maintain a complete and searchable registry of customers
+Streamline KYC review and approval workflows
+Enable rapid identification of high-risk or non-compliant users
+Provide clear visibility into customer account status and history
+
+4. Information Architecture
+
+The Customers section is structured into two primary views:
+
+Customer List View
+Customer Detail View
+
+Navigation between views must preserve context and filters.
+
+5. Customer List View
+Purpose
+
+Provide a scalable, high-level view of all registered customers.
+
+Core Features
+
+Customer Table
+Each row represents a single customer and must display:
+
+Full name
+
+Unique customer ID
+
+Registration date
+
+KYC status
+
+Account status (active or blocked)
+
+Primary action entry point
+
+Search and Filtering
+
+Search
+Supports keyword-based search across:
+
+Name
+
+Customer ID
+
+Email or phone number
+
+Search must return results in near real time.
+
+Filters
+Available filters include:
+
+KYC status (pending, approved, rejected)
+
+Account status (active, blocked)
+
+Registration date range
+
+Multiple filters must be combinable.
+
+Sorting
+
+Default sort order is most recently registered customers first.
+Users may sort by name, registration date, or KYC status.
+
+6. Customer Detail View
+Purpose
+
+Provide a comprehensive profile of an individual customer.
+
+Profile Information
+
+Basic identity information
+Contact details
+Account creation date
+Current KYC status
+Account status
+
+All displayed data must reflect the latest verified source.
+
+KYC Review Section
+
+KYC Data Display
+Uploaded identity documents
+Selfie or biometric verification where applicable
+Submitted personal information
+
+KYC Actions
+Approve KYC
+Reject KYC with mandatory rejection reason
+
+All actions must be logged with:
+
+Administrator identity
+
+Timestamp
+
+Decision rationale
+
+Account Control Actions
+
+Block Account
+Prevents all transactional activity
+Requires confirmation and reason
+
+Unblock Account
+Restores transactional access
+Requires appropriate authorization
+
+State changes must be immediate and auditable.
+
+7. Status Definitions
+
+KYC Status
+Pending: Submitted and awaiting review
+Approved: Fully verified and compliant
+Rejected: Verification failed or insufficient
+
+Account Status
+Active: Full platform access
+Blocked: Access restricted due to risk or violation
+
+Statuses must be clearly distinguishable visually and textually.
+
+
+8. Interaction and Safety Rules
+
+Destructive actions require confirmation.
+Bulk actions are restricted or disabled for high-risk operations.
+Blocked customers must be visually flagged across the platform.
+
+9. Performance and Scalability
+
+The customer list must support large datasets with pagination or virtualization.
+Search and filters must remain responsive under load.
+
+10. Accessibility and Design Requirements
+
+All controls must meet WCAG 2.1 AA standards.
+Status indicators must include text labels.
+Layouts must follow the Design System Foundation for typography, spacing, and color usage.
+
+11. Success Criteria
+
+Administrators can locate a customer within seconds.
+KYC decisions are traceable and defensible.
+Risk actions are executed confidently without ambiguity.
