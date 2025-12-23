@@ -1,29 +1,46 @@
-import { Card } from "@/components/ui/card"
-import { Construction } from "lucide-react"
+// app/dashboard/page.tsx
+'use client';
 
-export default function BankingPage() {
+import { SummaryHeader } from '@/components/banking/Header';
+import { IntegrationsSection } from '@/components/banking/IntegrationSection';
+import { SettlementActivity } from '@/components/banking/SettlementActivity';
+import { FailedTransactions } from '@/components/banking/FailedTransactions';
+import { ReconciliationOverview } from '@/components/banking/ReconciliationOverview';
+import {
+  DASHBOARD_STATS,
+  MOCK_INTEGRATIONS,
+  MOCK_SETTLEMENTS,
+  MOCK_FAILED_TRANSACTIONS,
+} from '@/components/banking/constants';
+
+export default function DashboardPage() {
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Banking Integration</h1>
-        <p className="mt-2 text-muted-foreground">Manage bank accounts, ACH transfers, and payment processing</p>
+        <h1 className="text-3xl font-bold">Operations Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Real-time monitoring of cross-border payment operations
+        </p>
       </div>
 
-      <Card className="p-8 text-center">
-        <div className="mx-auto max-w-sm">
-          <Construction className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <h2 className="mb-2 text-xl font-semibold text-foreground">Page Under Construction</h2>
-          <p className="text-muted-foreground">
-            The Banking Integration section is currently being developed.
-          </p>
-        </div>
-      </Card>
+      <SummaryHeader
+        activeIntegrations={DASHBOARD_STATS.activeIntegrations}
+        settlementHealth={DASHBOARD_STATS.settlementHealth}
+        reconHealth={DASHBOARD_STATS.reconHealth}
+        failedCount={DASHBOARD_STATS.failedCount}
+      />
 
-      <Card className="border border-dashed border-muted p-4">
-        <p className="text-center text-sm text-muted-foreground">
-          Check back soon for banking API integrations and payment processing features.
-        </p>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <IntegrationsSection integrations={MOCK_INTEGRATIONS} />
+          <SettlementActivity batches={MOCK_SETTLEMENTS} />
+        </div>
+        
+        <div className="space-y-6">
+          <ReconciliationOverview />
+          <FailedTransactions transactions={MOCK_FAILED_TRANSACTIONS} />
+        </div>
+      </div>
     </div>
-  )
+  );
 }
