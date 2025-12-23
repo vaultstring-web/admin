@@ -16,7 +16,6 @@ export const ROUTES = {
   NOTIFICATIONS: "/notifications",
   SETTINGS: "/settings",
   REPORTS: "/reports",
-  SUPPORT: "/support",
 } as const
 
 // Navigation menu structure
@@ -53,7 +52,6 @@ export const NAV_GROUPS = {
     items: [
       { title: "Compliance", href: ROUTES.COMPLIANCE, icon: "ShieldCheck" },
       { title: "Reports", href: ROUTES.REPORTS, icon: "BarChart3" },
-      { title: "Support", href: ROUTES.SUPPORT, icon: "HelpCircle" },
     ],
   },
 }

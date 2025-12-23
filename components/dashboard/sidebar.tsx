@@ -16,6 +16,7 @@ import {
   BarChart3,
   HelpCircle,
   ChevronRight,
+  CircleDot
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NAV_GROUPS } from "@/lib/constants"
@@ -41,40 +42,29 @@ export function Sidebar() {
   const { theme } = useTheme()
 
   return (
-    <aside className="fixed left-0 top-0 z-30 h-screen w-64 border-r border-border bg-sidebar">
+    <aside className="fixed left-0 top-0 z-30 h-screen w-64 border-r border-border/40 bg-background/95 backdrop-blur-sm">
       <div className="flex h-full flex-col">
-        {/* Logo - Changes based on theme */}
-        <div className="flex h-16 items-center border-b border-sidebar-border px-6">
-          <Link 
-            href="/" 
-            className="flex items-center justify-center w-full"
-          >
-            {theme === "dark" ? (
-              <img 
-                src="/icons/vs1.svg" 
-                alt="VaultString Logo" 
-                className="h-20 w-auto md:h-25 lg:h-25"
-              />
-            ) : (
-              <img 
-                src="/icons/vs2.svg" 
-                alt="VaultString Logo" 
-                className="h-20 w-auto md:h-25 lg:h-25"
-              />
-            )}
+        {/* Logo Section - Clean & Centered */}
+        <div className="flex h-20 items-center px-6">
+          <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
+            <img 
+              src={theme === "dark" ? "/icons/vs1.svg" : "/icons/vs2.svg"} 
+              alt="Logo" 
+              className="h-20 w-auto md:h-25 lg:h-25"
+            />
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-6">
+        <nav className="flex-1 space-y-8 overflow-y-auto px-4 py-4 scrollbar-none">
           {Object.values(NAV_GROUPS).map((group) => (
-            <div key={group.title}>
-              <div className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/60">
+            <div key={group.title} className="space-y-2">
+              <h3 className="px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
                 {group.title}
-              </div>
+              </h3>
               <div className="space-y-1">
                 {group.items.map((item) => {
-                  const Icon = iconMap[item.icon as keyof typeof iconMap]
+                  const Icon = iconMap[item.icon as keyof typeof iconMap] || CircleDot
                   const isActive = pathname === item.href
 
                   return (
@@ -82,25 +72,26 @@ export function Sidebar() {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                        "group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200",
                         isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-[0_0_15px_rgba(68,138,51,0.5)]"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                          ? "bg-primary/5 text-primary ring-1 ring-inset ring-primary/20"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                       )}
                     >
-                      {/* Green glow border for active item */}
+                      {/* Active Indicator Strip */}
                       {isActive && (
-                        <div className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-linear-to-b from-[#448a33] to-[#3b5a65]"></div>
+                        <div className="absolute left-0 h-5 w-1 rounded-r-full bg-primary" />
                       )}
                       
-                      <Icon className={cn("h-4 w-4 transition-all", isActive && "text-[#448a33]")} />
+                      <Icon className={cn(
+                        "h-4.5 w-4.5 shrink-0 transition-colors",
+                        isActive ? "text-primary" : "text-muted-foreground/70 group-hover:text-foreground"
+                      )} />
                       
-                      <span className="relative z-10">{item.title}</span>
+                      <span className="flex-1 tracking-tight">{item.title}</span>
                       
                       {isActive && (
-                        <div className="ml-auto">
-                          <ChevronRight className="h-4 w-4 text-[#448a33]" />
-                        </div>
+                        <ChevronRight className="h-3 w-3 animate-in fade-in slide-in-from-left-2" />
                       )}
                     </Link>
                   )
@@ -110,11 +101,20 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-sidebar-border p-4">
-          <div className="rounded-lg bg-sidebar-accent/50 p-3">
-            <p className="text-xs font-medium text-sidebar-foreground">Development Environment</p>
-            <p className="mt-1 text-xs text-sidebar-foreground/60">v1.0.0 - Scaffolding</p>
+        {/* Footer - Floating Card Style */}
+        <div className="mt-auto p-4">
+          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-muted/30 p-4 transition-colors hover:bg-muted/50">
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Box className="h-4 w-4" />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-[11px] font-bold text-foreground">v1.0.0 Stable</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Dev Environment</p>
+              </div>
+            </div>
+            {/* Subtle background glow */}
+            <div className="absolute -right-4 -top-4 h-12 w-12 rounded-full bg-primary/5 blur-2xl" />
           </div>
         </div>
       </div>
