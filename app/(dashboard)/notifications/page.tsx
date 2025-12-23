@@ -1,31 +1,68 @@
-import { Card } from "@/components/ui/card"
-import { Construction } from "lucide-react"
+'use client';
+
+import { useState } from 'react';
+import { NotificationList } from '@/components/notifications/NotificationList';
+import { NotificationStats } from '@/components/notifications/NotificationStats';
+import { NotificationPreferences } from '@/components/notifications/NotificationPreferences';
+import { MOCK_NOTIFICATIONS } from '@/components/notifications/constants';
+import { Notification, NotificationStatus } from '@/components/notifications/types';
+import { Bell } from 'lucide-react';
 
 export default function NotificationsPage() {
+  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id
+          ? { ...notification, status: NotificationStatus.READ, readAt: new Date().toISOString() }
+          : notification
+      )
+    );
+  };
+
+  const handleMarkAllAsRead = () => {
+    setNotifications(prev =>
+      prev.map(notification => ({
+        ...notification,
+        status: NotificationStatus.READ,
+        readAt: new Date().toISOString()
+      }))
+    );
+  };
+
+  const handleDelete = (id: string) => {
+    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Notification Management</h1>
-        <p className="mt-2 text-muted-foreground">
-          Manage system notifications, email campaigns, and user communications
+        <h1 className="text-3xl font-bold flex items-center gap-3">
+          <Bell className="h-8 w-8" />
+          Notifications
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Stay updated with system alerts, transactions, and important updates
         </p>
       </div>
 
-      <Card className="p-8 text-center">
-        <div className="mx-auto max-w-sm">
-          <Construction className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <h2 className="mb-2 text-xl font-semibold text-foreground">Page Under Construction</h2>
-          <p className="text-muted-foreground">
-            The Notification Management section is currently being developed.
-          </p>
-        </div>
-      </Card>
+      <NotificationStats notifications={notifications} />
 
-      <Card className="border border-dashed border-muted p-4">
-        <p className="text-center text-sm text-muted-foreground">
-          Check back soon for email, SMS, and push notification features.
-        </p>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <NotificationList
+            notifications={notifications}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAllAsRead={handleMarkAllAsRead}
+            onDelete={handleDelete}
+          />
+        </div>
+
+        <div>
+          <NotificationPreferences />
+        </div>
+      </div>
     </div>
-  )
+  );
 }
