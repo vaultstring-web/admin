@@ -21,8 +21,7 @@ export function DashboardHeader() {
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background px-6">
       <div className="flex items-center gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">Admin Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Manage your fintech platform</p>
+          <h1 className="text-lg font-semibold text-foreground">VaultString Admin Dashboard</h1>
         </div>
       </div>
 
