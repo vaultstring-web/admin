@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,7 +50,7 @@ function makeMock(n = 24): SimplifiedMerchant[] {
     contact: `contact+${i}@example.com`,
     email: `contact+${i}@example.com`,
     phone: `+1 (555) ${1000 + i.toString().padStart(4, '0')}`,
-    riskScore: Math.floor(Math.random() * 100)
+    riskScore: (i * 13) % 100
   }));
 }
 
@@ -57,6 +58,7 @@ export default function MerchantList({
   merchants, 
   onSelectMerchant 
 }: MerchantListProps = {}) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<string>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
@@ -100,7 +102,7 @@ export default function MerchantList({
       onSelectMerchant(id);
     } else {
       // Default behavior: navigate to merchant detail page
-      window.location.href = `/dashboard/merchants/${id}`;
+      router.push(`/dashboard/merchants/${id}`);
     }
   };
 

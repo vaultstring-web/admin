@@ -107,7 +107,7 @@ export const NotificationPreferences: React.FC = () => {
 
 interface PreferenceItemProps {
   id: string;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   description: string;
   checked: boolean;

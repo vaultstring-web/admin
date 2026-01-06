@@ -2,6 +2,7 @@
 
 import { Bell, Moon, Sun, User, LogOut, Settings2, Shield } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,9 +13,49 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/AuthContext"
 
 export function DashboardHeader() {
   const { theme, setTheme } = useTheme()
+  const { user, logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      // Use window.location for hard redirect to ensure clean state
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Force redirect even if logout fails
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login'
+      }
+    }
+  }
+
+  const getUserInitials = () => {
+    if (!user) return 'AD'
+    const firstName = user.first_name || ''
+    const lastName = user.last_name || ''
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase()
+    }
+    if (user.email) {
+      return user.email.substring(0, 2).toUpperCase()
+    }
+    return 'AD'
+  }
+
+  const getUserDisplayName = () => {
+    if (!user) return 'Admin User'
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`
+    }
+    return user.email || 'Admin User'
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/40 bg-background/80 px-6 backdrop-blur-md">
@@ -59,8 +100,8 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 ring-offset-background transition-all hover:ring-2 hover:ring-primary/20 hover:ring-offset-2">
               <Avatar className="h-9 w-9 border border-border/50">
-                <AvatarFallback className="bg-linear-to-br from-brand-green to-brand-blue text-[10px] font-bold text-white uppercase tracking-tighter">
-                  AD
+                <AvatarFallback className="bg-gradient-to-br from-brand-green to-brand-blue text-[10px] font-bold text-white uppercase tracking-tighter">
+                  {getUserInitials()}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -68,24 +109,33 @@ export function DashboardHeader() {
           <DropdownMenuContent align="end" className="w-64 rounded-2xl p-2 shadow-xl shadow-foreground/5 border-border/50">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1 p-2">
-                <p className="text-sm font-bold leading-none tracking-tight">Admin User</p>
-                <p className="text-xs leading-none text-muted-foreground">admin@vaultstring.com</p>
+                <p className="text-sm font-bold leading-none tracking-tight">{getUserDisplayName()}</p>
+                <p className="text-xs leading-none text-muted-foreground">{user?.email || 'admin@vaultstring.com'}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="opacity-50" />
             <div className="p-1">
-              <DropdownMenuItem className="rounded-lg py-2 cursor-pointer gap-2">
+              <DropdownMenuItem 
+                className="rounded-lg py-2 cursor-pointer gap-2"
+                onClick={() => router.push('/settings')}
+              >
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium">Profile Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-lg py-2 cursor-pointer gap-2">
+              <DropdownMenuItem 
+                className="rounded-lg py-2 cursor-pointer gap-2"
+                onClick={() => router.push('/settings')}
+              >
                 <Settings2 className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium">System Preferences</span>
               </DropdownMenuItem>
             </div>
             <DropdownMenuSeparator className="opacity-50" />
             <div className="p-1">
-              <DropdownMenuItem className="rounded-lg py-2 cursor-pointer gap-2 text-destructive focus:bg-destructive/5 focus:text-destructive">
+              <DropdownMenuItem 
+                className="rounded-lg py-2 cursor-pointer gap-2 text-destructive focus:bg-destructive/5 focus:text-destructive"
+                onClick={handleLogout}
+              >
                 <LogOut className="h-4 w-4" />
                 <span className="text-xs font-bold uppercase tracking-wider">Log out</span>
               </DropdownMenuItem>

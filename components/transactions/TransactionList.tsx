@@ -1,6 +1,6 @@
 // app/components/transactions/TransactionList.tsx
 import { format } from 'date-fns';
-import { AlertCircle, ChevronRight, Clock, Flag } from 'lucide-react';
+import { AlertCircle, Clock, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -14,12 +14,8 @@ interface TransactionListProps {
   formatAmount: (amount: number) => string;
 }
 
-export function TransactionList({
-  transactions,
-  onSelectTransaction,
-  onFlagTransaction,
-  formatAmount,
-}: TransactionListProps) {
+export function TransactionList(props: TransactionListProps) {
+  const { transactions, onFlagTransaction, formatAmount } = props;
   return (
     <Card className="overflow-hidden border-none shadow-sm bg-white dark:bg-slate-950">
       <div className="overflow-x-auto">

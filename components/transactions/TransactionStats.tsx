@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Banknote, AlertCircle, CheckCircle, Clock, BarChart3 } from 'lucide-react';
 import { type Transaction } from './types';
@@ -11,11 +11,6 @@ interface TransactionStatsProps {
 }
 
 export function TransactionStats({ transactions }: TransactionStatsProps) {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const stats = {
     total: transactions.length,
@@ -24,19 +19,6 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
     pending: transactions.filter(tx => tx.status === 'Pending').length,
     totalAmount: transactions.reduce((sum, tx) => sum + tx.rawAmount, 0),
   };
-
-  if (!mounted) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-        {[...Array(5)].map((_, i) => (
-          <Card key={i} className={cn("p-5 animate-pulse border-none ring-1 ring-slate-100 dark:ring-slate-800", i === 4 ? "lg:col-span-2" : "lg:col-span-1")}>
-            <div className="h-3 w-16 bg-slate-100 dark:bg-slate-800 rounded mb-4" />
-            <div className="h-8 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
-          </Card>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
@@ -86,7 +68,15 @@ function StatCard({
   isCurrency,
   isDestructive,
   className
-}: any) {
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  color: 'blue' | 'red' | 'emerald' | 'amber' | 'violet';
+  isCurrency?: boolean;
+  isDestructive?: boolean;
+  className?: string;
+}) {
   const colorMap = {
     blue: "text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400",
     red: "text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400",

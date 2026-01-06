@@ -7,14 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   CheckCircle2, 
-  AlertCircle, 
   AlertTriangle, 
   Info, 
   Shield, 
   Bell, 
   XCircle, 
   Check, 
-  ArrowRight,
   Inbox
 } from 'lucide-react';
 import { format } from 'date-fns';

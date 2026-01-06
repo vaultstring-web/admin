@@ -10,9 +10,10 @@ import { Button } from './Button';
 interface CustomerListProps {
   customers: Customer[];
   onSelectCustomer: (id: string) => void;
+  loading?: boolean;
 }
 
-export const CustomerList = ({ customers, onSelectCustomer }: CustomerListProps) => {
+export const CustomerList = ({ customers, onSelectCustomer, loading = false }: CustomerListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [kycFilter, setKycFilter] = useState<KYCStatus | 'ALL'>('ALL');
   const [accountFilter, setAccountFilter] = useState<AccountStatus | 'ALL'>('ALL');
@@ -183,7 +184,16 @@ export const CustomerList = ({ customers, onSelectCustomer }: CustomerListProps)
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-neutral-dark-surface divide-y divide-neutral-light-border dark:divide-neutral-dark-border">
-              {filteredCustomers.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-[#448a33]"></div>
+                      <p className="font-medium">Loading users...</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-10 text-center text-sm text-neutral-light-text dark:text-neutral-dark-text">
                     <div className="flex flex-col items-center gap-2">

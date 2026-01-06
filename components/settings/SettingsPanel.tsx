@@ -1,7 +1,7 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, ShieldCheck, Key, Activity, Sparkles } from 'lucide-react';
+import { Settings, ShieldCheck, Key, Activity } from 'lucide-react';
 import { SecuritySettings } from './SecuritySettings';
 import { ApiKeysSettings } from './ApiKeysSettings';
 import { ServiceStatusSettings } from './ServiceStatusSettings';

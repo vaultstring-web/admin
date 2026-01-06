@@ -24,7 +24,7 @@ export interface Notification {
   timestamp: string;
   actionUrl?: string;
   actionText?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   userId?: string;
   readAt?: string;
 }

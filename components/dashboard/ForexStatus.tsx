@@ -9,8 +9,20 @@ interface ForexStatusProps {
 }
 
 export const ForexStatus = ({ data }: ForexStatusProps) => {
-  const isLive = data.forex.status === 'Live';
-  const isUp = data.forex.trend === 'up';
+  // Handle missing or undefined forex data
+  const forex = data?.forex;
+  if (!forex) {
+    return (
+      <Card className="relative overflow-hidden group">
+        <div className="flex items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+          <p className="text-sm">Forex data unavailable</p>
+        </div>
+      </Card>
+    );
+  }
+  
+  const isLive = forex.status === 'Live';
+  const isUp = forex.trend === 'up';
 
   return (
     <Card className="relative overflow-hidden group">
@@ -43,7 +55,7 @@ export const ForexStatus = ({ data }: ForexStatusProps) => {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#448a33]"></span>
             </span>
           )}
-          {data.forex.status}
+          {forex.status}
         </div>
       </div>
 
@@ -56,7 +68,7 @@ export const ForexStatus = ({ data }: ForexStatusProps) => {
             </p>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-bold font-mono tracking-tighter text-gray-900 dark:text-white">
-                {data.forex.rate.toFixed(5)}
+                {forex.rate.toFixed(5)}
               </span>
               <div className={`flex items-center gap-0.5 text-xs font-bold ${
                 isUp ? 'text-[#448a33]' : 'text-red-500'
@@ -70,7 +82,7 @@ export const ForexStatus = ({ data }: ForexStatusProps) => {
           <div className="text-right">
              <p className="text-[9px] text-gray-400 uppercase font-bold mb-1">As of</p>
              <p className="text-[11px] font-mono font-medium text-gray-600 dark:text-gray-300">
-               {new Date(data.forex.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+               {new Date(forex.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
              </p>
           </div>
         </div>

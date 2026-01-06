@@ -43,11 +43,11 @@ const HealthMetric = ({ label, value, status, icon }: HealthMetricProps) => {
 };
 
 export const SystemHealth = ({ data }: SystemHealthProps) => {
-  const chartData = Array.from({ length: 24 }, (_, i) => ({
-    time: `${i}:00`,
-    latency: 120 + Math.random() * 40,
-    errors: Math.random() < 0.15 ? 40 + Math.random() * 60 : 0,
-  }));
+  const chartData = Array.from({ length: 24 }, (_, i) => {
+    const latency = 120 + (i % 10) * 4;
+    const errors = i % 7 === 0 ? 60 : 0;
+    return { time: `${i}:00`, latency, errors };
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

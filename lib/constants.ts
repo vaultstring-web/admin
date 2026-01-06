@@ -55,3 +55,5 @@ export const NAV_GROUPS = {
     ],
   },
 }
+
+export const API_BASE = `${process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:9000'}/api/v1`

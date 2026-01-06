@@ -6,10 +6,12 @@ import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionFilters } from '@/components/transactions/TransactionFilters';
 import { FlagTransactionDialog } from '@/components/transactions/FlagTransactionDialog';
 import { TransactionStats } from '@/components/transactions/TransactionStats';
-import { MOCK_TRANSACTIONS } from '@/components/transactions/constants';
 import { type Transaction } from '@/components/transactions/types';
+import { API_BASE } from '@/lib/constants';
+import { useSession } from '@/hooks/useSession';
 
 export default function TransactionMonitoringPage() {
+  const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [filters, setFilters] = useState({
     search: '',
     status: 'all',
@@ -19,19 +21,82 @@ export default function TransactionMonitoringPage() {
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    if (sessionLoading || !isAuthenticated) {
+      return;
+    }
+
+    const fetchTransactions = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('vs_token') : null;
+      if (!token) {
+        setError('Not authenticated');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/transactions?limit=100&offset=0`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+        
+        if (!res.ok) {
+          throw new Error('Failed to fetch transactions');
+        }
+
+        const data = await res.json();
+        const txs = Array.isArray(data.transactions) ? data.transactions : [];
+        
+        // Map backend transactions to frontend format
+        const mapped: Transaction[] = txs.map((t: any) => ({
+          id: t.id || t.transaction_id || '',
+          customer: t.sender_name || t.sender_email || 'Unknown',
+          merchant: t.receiver_name || t.receiver_email || 'Unknown',
+          rawAmount: parseFloat(t.amount || 0),
+          currency: t.currency || 'MWK',
+          status: mapStatus(t.status),
+          date: new Date(t.created_at || t.timestamp || Date.now()),
+          flagged: t.flagged || false,
+        }));
+
+        setTransactions(mapped);
+      } catch (err: any) {
+        console.error('Failed to fetch transactions:', err);
+        setError(err?.message || 'Failed to load transactions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [sessionLoading, isAuthenticated]);
+
+  const mapStatus = (status: string): 'Completed' | 'Pending' | 'Failed' => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('completed') || s.includes('settled')) return 'Completed';
+    if (s.includes('failed') || s.includes('error')) return 'Failed';
+    return 'Pending';
+  };
+
   const filteredTransactions = useMemo(() => {
-    return MOCK_TRANSACTIONS.filter((tx: { id: string; customer: string; merchant: string; status: string; currency: string; }) => {
+    return transactions.filter((tx) => {
       const matchesSearch = tx.id.toLowerCase().includes(filters.search.toLowerCase()) ||
         tx.customer.toLowerCase().includes(filters.search.toLowerCase()) ||
         tx.merchant.toLowerCase().includes(filters.search.toLowerCase());
-      const matchesStatus = filters.status === 'all' || tx.status === filters.status;
+      const matchesStatus = filters.status === 'all' || tx.status.toLowerCase() === filters.status.toLowerCase();
       const matchesCurrency = filters.currency === 'all' || tx.currency === filters.currency;
       return matchesSearch && matchesStatus && matchesCurrency;
     });
-  }, [filters]);
+  }, [transactions, filters]);
 
   const formatAmount = (amount: number) => {
     if (!mounted) return amount.toFixed(2);
@@ -67,12 +132,31 @@ export default function TransactionMonitoringPage() {
     });
   };
 
+  if (sessionLoading || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading transactions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Transaction Monitoring</h1>
         <p className="mt-2 text-muted-foreground">
-          Monitor and review transactions for suspicious activity
+          Monitor and review transactions for suspicious activity • {transactions.length} total transactions
         </p>
       </div>
 

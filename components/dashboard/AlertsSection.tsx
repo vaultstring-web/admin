@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { DashboardData, Alert } from './types';
 
 interface AlertsSectionProps {
-  data: DashboardData;
+  alerts: Alert[];
 }
 
 const SeverityBadge = ({ severity }: { severity: Alert['severity'] }) => {
@@ -22,7 +22,7 @@ const SeverityBadge = ({ severity }: { severity: Alert['severity'] }) => {
   );
 };
 
-export const AlertsSection = ({ data }: AlertsSectionProps) => {
+export const AlertsSection = ({ alerts = [] }: AlertsSectionProps) => {
   return (
     <Card className="flex-1 relative overflow-hidden">
       {/* Header with Semantic Count */}
@@ -32,7 +32,7 @@ export const AlertsSection = ({ data }: AlertsSectionProps) => {
             System Events
           </h3>
           <p className="text-[10px] text-gray-400 font-medium uppercase tracking-tighter">
-            {data.alerts.length} operational events • Last 24h
+            {alerts.length} operational events • Last 24h
           </p>
         </div>
         <button className="text-[10px] font-bold text-[#3b5a65] dark:text-[#7ba1ad] uppercase hover:underline">
@@ -45,7 +45,7 @@ export const AlertsSection = ({ data }: AlertsSectionProps) => {
         <div className="absolute left-4.75 top-2 bottom-2 w-px bg-gray-100 dark:bg-gray-800" />
 
         <AnimatePresence>
-          {data.alerts.length === 0 ? (
+          {alerts.length === 0 ? (
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -59,7 +59,7 @@ export const AlertsSection = ({ data }: AlertsSectionProps) => {
               <p className="text-xs text-gray-400 mt-1">No operational incidents reported.</p>
             </motion.div>
           ) : (
-            data.alerts.map((alert, index) => {
+            alerts.map((alert, index) => {
               const isCritical = alert.severity === 'Critical';
               return (
                 <motion.div 
@@ -112,7 +112,7 @@ export const AlertsSection = ({ data }: AlertsSectionProps) => {
       </div>
       
       {/* Decorative Glow for Critical Alerts */}
-      {data.alerts.some(a => a.severity === 'Critical') && (
+      {alerts.some(a => a.severity === 'Critical') && (
         <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl pointer-events-none" />
       )}
     </Card>

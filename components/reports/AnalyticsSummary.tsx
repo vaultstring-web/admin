@@ -3,8 +3,46 @@
 import { TrendingUp, TrendingDown, Users, Currency, CreditCard, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export const AnalyticsSummary = () => {
-  const metrics = [
+interface AnalyticsSummaryProps {
+  metrics?: any;
+}
+
+export const AnalyticsSummary = ({ metrics: systemMetrics }: AnalyticsSummaryProps = {}) => {
+  // Use real metrics if available, otherwise use defaults
+  const metrics = systemMetrics ? [
+    {
+      title: 'Transaction Volume',
+      value: `${(systemMetrics.total_volume || 0).toLocaleString()}`,
+      change: '+12.5%',
+      trendingUp: true,
+      icon: CreditCard,
+      color: 'text-emerald-500',
+    },
+    {
+      title: 'Active Users',
+      value: `${(systemMetrics.active_users || 0).toLocaleString()}`,
+      change: '+8.3%',
+      trendingUp: true,
+      icon: Users,
+      color: 'text-blue-500',
+    },
+    {
+      title: 'Total Transactions',
+      value: `${(systemMetrics.total_transactions || 0).toLocaleString()}`,
+      change: '+15.2%',
+      trendingUp: true,
+      icon: Currency,
+      color: 'text-primary',
+    },
+    {
+      title: 'Total Users',
+      value: `${(systemMetrics.total_users || 0).toLocaleString()}`,
+      change: '+5.1%',
+      trendingUp: true,
+      icon: Building2,
+      color: 'text-violet-500',
+    }
+  ] : [
     {
       title: 'Transaction Volume',
       value: '¥8.2M',

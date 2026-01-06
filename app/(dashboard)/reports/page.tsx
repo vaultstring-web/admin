@@ -2,22 +2,68 @@
 
 import { AnalyticsDashboard } from '@/components/reports/AnalyticsDashboard';
 import { Shield, LineChart, RefreshCw, FileDown, Clock, Database, CheckCircle2, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  getSystemMetrics,
+  getEarningsReport,
+  getAuditLogs,
+  type SystemMetrics,
+  type EarningsReport,
+} from '@/lib/api';
+import { useSession } from '@/hooks/useSession';
 
 export default function ReportsPage() {
+  const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
+  const [earnings, setEarnings] = useState<EarningsReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setIsRefreshing(true);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const [metricsRes, earningsRes] = await Promise.all([
+        getSystemMetrics(),
+        getEarningsReport(startDate, endDate),
+      ]);
+
+      if (metricsRes.data) {
+        setMetrics(metricsRes.data);
+      }
+
+      if (earningsRes.data?.reports) {
+        setEarnings(earningsRes.data.reports);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch reports data:', err);
+      setError(err?.message || 'Failed to load reports data');
+    } finally {
+      setIsRefreshing(false);
+      setLoading(false);
+      setRefreshKey(prev => prev + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionLoading || !isAuthenticated) {
+      return;
+    }
+    fetchData();
+  }, [sessionLoading, isAuthenticated]);
 
   const handleRefresh = () => {
-    setIsRefreshing(true);
-    // Simulate a data fetch
-    setTimeout(() => {
-      setRefreshKey(prev => prev + 1);
-      setIsRefreshing(false);
-    }, 1000);
+    fetchData();
   };
 
   return (
@@ -135,9 +181,24 @@ export default function ReportsPage() {
         {/* Main Analytics Content Container */}
         <main className="relative rounded-4xl border border-border/40 bg-muted/20 p-1">
           <div className="bg-background rounded-[1.8rem] border border-border/50 shadow-sm overflow-hidden">
-            <div className="p-1 min-h-125" key={refreshKey}>
-              <AnalyticsDashboard />
-            </div>
+            {(sessionLoading || loading) && !metrics ? (
+              <div className="flex items-center justify-center min-h-[400px] p-8">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4"></div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Loading analytics data...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="p-8">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-1 min-h-125" key={refreshKey}>
+                <AnalyticsDashboard metrics={metrics} earnings={earnings} />
+              </div>
+            )}
           </div>
         </main>
       </div>

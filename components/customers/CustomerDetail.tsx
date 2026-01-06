@@ -11,38 +11,91 @@ import { Modal } from './Modal';
 interface CustomerDetailProps {
   customer: Customer;
   onBack: () => void;
-  onUpdateStatus: (id: string, newStatus: KYCStatus | AccountStatus, reason?: string) => void;
+  onUpdateStatus: (id: string, newStatus: KYCStatus | AccountStatus, reason?: string) => Promise<void>;
+  onDelete?: (id: string, reason?: string) => Promise<void>;
 }
 
-export const CustomerDetail = ({ customer, onBack, onUpdateStatus }: CustomerDetailProps) => {
+export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: CustomerDetailProps) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'kyc' | 'history'>('profile');
   
   // Modal States
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [updating, setUpdating] = useState(false);
 
-  const handleRejectKYC = () => {
-    onUpdateStatus(customer.id, KYCStatus.REJECTED, reason);
-    setIsRejectModalOpen(false);
-    setReason('');
-  };
-
-  const handleBlockAccount = () => {
-    onUpdateStatus(customer.id, AccountStatus.BLOCKED, reason);
-    setIsBlockModalOpen(false);
-    setReason('');
-  };
-  
-  const handleApproveKYC = () => {
-    if (window.confirm("Are you sure you want to approve this customer's KYC? This action will be logged.")) {
-      onUpdateStatus(customer.id, KYCStatus.APPROVED);
+  const handleRejectKYC = async () => {
+    if (!reason.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+    setUpdating(true);
+    try {
+      await onUpdateStatus(customer.id, KYCStatus.REJECTED, reason);
+      setIsRejectModalOpen(false);
+      setReason('');
+    } catch (err) {
+      console.error('Failed to reject KYC:', err);
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const handleUnblock = () => {
+  const handleBlockAccount = async () => {
+    if (!reason.trim()) {
+      alert('Please provide a reason for blocking');
+      return;
+    }
+    setUpdating(true);
+    try {
+      await onUpdateStatus(customer.id, AccountStatus.BLOCKED, reason);
+      setIsBlockModalOpen(false);
+      setReason('');
+    } catch (err) {
+      console.error('Failed to block account:', err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+  
+  const handleApproveKYC = async () => {
+    if (window.confirm("Are you sure you want to approve this customer's KYC? This action will be logged.")) {
+      setUpdating(true);
+      try {
+        await onUpdateStatus(customer.id, KYCStatus.APPROVED);
+      } catch (err) {
+        console.error('Failed to approve KYC:', err);
+      } finally {
+        setUpdating(false);
+      }
+    }
+  };
+
+  const handleUnblock = async () => {
     if (window.confirm("Are you sure you want to unblock this account?")) {
-      onUpdateStatus(customer.id, AccountStatus.ACTIVE);
+      setUpdating(true);
+      try {
+        await onUpdateStatus(customer.id, AccountStatus.ACTIVE);
+      } catch (err) {
+        console.error('Failed to unblock account:', err);
+      } finally {
+        setUpdating(false);
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    const deleteReason = prompt('Please provide a reason for deleting this user account:');
+    if (deleteReason) {
+      setUpdating(true);
+      try {
+        await onDelete(customer.id, deleteReason);
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+      } finally {
+        setUpdating(false);
+      }
     }
   };
 
@@ -56,13 +109,36 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus }: CustomerDet
         </Button>
         <div className="flex gap-2">
           {customer.accountStatus === AccountStatus.ACTIVE && (
-            <Button variant="danger" size="sm" leftIcon={<ShieldAlert className="w-4 h-4"/>} onClick={() => setIsBlockModalOpen(true)}>
-              Block Account
+            <Button 
+              variant="danger" 
+              size="sm" 
+              leftIcon={<ShieldAlert className="w-4 h-4"/>} 
+              onClick={() => setIsBlockModalOpen(true)}
+              disabled={updating}
+            >
+              {updating ? 'Updating...' : 'Block Account'}
             </Button>
           )}
           {customer.accountStatus === AccountStatus.BLOCKED && (
-            <Button variant="secondary" size="sm" leftIcon={<ShieldCheck className="w-4 h-4"/>} onClick={handleUnblock}>
-              Unblock Account
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              leftIcon={<ShieldCheck className="w-4 h-4"/>} 
+              onClick={handleUnblock}
+              disabled={updating}
+            >
+              {updating ? 'Updating...' : 'Unblock Account'}
+            </Button>
+          )}
+          {onDelete && (
+            <Button 
+              variant="danger" 
+              size="sm" 
+              leftIcon={<XCircle className="w-4 h-4"/>} 
+              onClick={handleDelete}
+              disabled={updating}
+            >
+              {updating ? 'Deleting...' : 'Delete User'}
             </Button>
           )}
         </div>
@@ -157,8 +233,12 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus }: CustomerDet
                   <h3 className="text-lg font-medium text-neutral-light-heading dark:text-neutral-dark-heading">Submitted Documents</h3>
                   {customer.kycStatus === KYCStatus.PENDING && (
                     <div className="flex gap-2">
-                      <Button size="sm" variant="danger" onClick={() => setIsRejectModalOpen(true)}>Reject</Button>
-                      <Button size="sm" variant="primary" onClick={handleApproveKYC}>Approve</Button>
+                      <Button size="sm" variant="danger" onClick={() => setIsRejectModalOpen(true)} disabled={updating}>
+                        Reject
+                      </Button>
+                      <Button size="sm" variant="primary" onClick={handleApproveKYC} disabled={updating}>
+                        {updating ? 'Updating...' : 'Approve'}
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -283,7 +363,9 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus }: CustomerDet
         type="danger"
         footer={
           <>
-            <Button variant="danger" onClick={handleRejectKYC} disabled={!reason}>Confirm Rejection</Button>
+            <Button variant="danger" onClick={handleRejectKYC} disabled={!reason || updating}>
+              {updating ? 'Updating...' : 'Confirm Rejection'}
+            </Button>
             <Button variant="ghost" onClick={() => setIsRejectModalOpen(false)} className="mr-3">Cancel</Button>
           </>
         }
@@ -305,7 +387,9 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus }: CustomerDet
         type="danger"
         footer={
           <>
-            <Button variant="danger" onClick={handleBlockAccount} disabled={!reason}>Block Account</Button>
+            <Button variant="danger" onClick={handleBlockAccount} disabled={!reason || updating}>
+              {updating ? 'Updating...' : 'Block Account'}
+            </Button>
             <Button variant="ghost" onClick={() => setIsBlockModalOpen(false)} className="mr-3">Cancel</Button>
           </>
         }

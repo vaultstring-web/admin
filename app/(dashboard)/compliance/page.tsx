@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Shield, UserCheck, AlertTriangle, ListFilter } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,23 +11,113 @@ import { KYCQueue } from '@/components/compliance/KYCQueue';
 import { FlaggedTransactions } from '@/components/compliance/FlaggedTransactions';
 import { AuditLogTable } from '@/components/compliance/AuditLogTable';
 import { ComplianceReports } from '@/components/compliance/ComplianceReports';
+import type { FlaggedTransaction as ComplianceTx } from '@/components/compliance/types';
 import {
-  MOCK_KYC_APPLICATIONS,
-  MOCK_FLAGGED_TRANSACTIONS,
-  MOCK_AUDIT_LOGS,
-  MOCK_COMPLIANCE_REPORTS
-} from '@/components/compliance/constants';
+  getKYCApplications,
+  getAuditLogs,
+  getComplianceReports,
+  getTransactions,
+  type KYCApplication,
+  type AuditLog,
+  type ComplianceReport,
+} from '@/lib/api';
+import { useSession } from '@/hooks/useSession';
 
 export default function CompliancePage() {
+  const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [activeTab, setActiveTab] = useState('kyc');
+  const [flagged, setFlagged] = useState<ComplianceTx[]>([]);
+  const [kycApplications, setKycApplications] = useState<KYCApplication[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [complianceReports, setComplianceReports] = useState<ComplianceReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   function handleReviewKYC(id: string): void {
-    throw new Error('Function not implemented.');
+    // Implementation for reviewing KYC
+    console.log('Review KYC:', id);
   }
 
   function handleInvestigateTransaction(id: string): void {
-    throw new Error('Function not implemented.');
+    // Implementation for investigating transaction
+    console.log('Investigate transaction:', id);
   }
+
+  useEffect(() => {
+    if (sessionLoading || !isAuthenticated) {
+      return;
+    }
+
+    const fetchAllData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Fetch KYC applications
+        const kycRes = await getKYCApplications(undefined, 50, 0);
+        if (kycRes.data?.applications) {
+          setKycApplications(kycRes.data.applications);
+        }
+
+        // Fetch audit logs
+        const auditRes = await getAuditLogs(100, 0);
+        if (auditRes.data?.logs) {
+          setAuditLogs(auditRes.data.logs);
+        }
+
+        // Fetch compliance reports
+        const reportsRes = await getComplianceReports(50, 0);
+        if (reportsRes.data?.reports) {
+          setComplianceReports(reportsRes.data.reports);
+        }
+
+        // Fetch flagged transactions
+        const txsRes = await getTransactions(100, 0, { status: 'failed' });
+        if (txsRes.data?.transactions) {
+          const mapped: ComplianceTx[] = txsRes.data.transactions
+            .slice(0, 20)
+            .map((t: any) => {
+              const rawAmount = typeof t.amount === 'string' ? parseFloat(t.amount) : typeof t.amount === 'number' ? t.amount : 0;
+              const currency = String(t.currency || 'USD');
+              const id = String(t.id || t.reference || '').trim() || `TX-${Date.now()}`;
+              const transactionId = String(t.reference || id);
+              const customerId = String(t.sender_id || '');
+              const customerName = customerId ? `User-${customerId.slice(0, 8)}` : 'Unknown';
+              const timestamp = String(t.created_at || new Date().toISOString());
+              const reason = String(t.status_reason || 'Review required');
+              const factors: string[] = [];
+              if (reason.toLowerCase().includes('kyc')) factors.push('KYC');
+              if (reason.toLowerCase().includes('sanction')) factors.push('Sanctions');
+              if (reason.toLowerCase().includes('timeout')) factors.push('API Timeout');
+              if (factors.length === 0) factors.push('System');
+              const riskScore = factors.includes('Sanctions') ? 85 : factors.includes('KYC') ? 70 : 55;
+              return {
+                id,
+                transactionId,
+                customerId,
+                customerName,
+                amount: rawAmount,
+                currency,
+                timestamp,
+                flagReason: reason,
+                riskScore,
+                riskFactors: factors,
+                status: 'pending_review',
+                auditTrail: [],
+              } as ComplianceTx;
+            });
+          setFlagged(mapped);
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch compliance data:', err);
+        setError(err?.message || 'Failed to load compliance data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllData();
+  }, [sessionLoading, isAuthenticated]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500">
@@ -42,10 +132,23 @@ export default function CompliancePage() {
         </p>
       </div>
 
+      {sessionLoading || loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4"></div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Loading compliance data...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
+        </div>
+      ) : (
+        <>
       {/* 2. Key Metrics: High Contrast */}
       <ComplianceStats 
-        kycApplications={MOCK_KYC_APPLICATIONS}
-        flaggedTransactions={MOCK_FLAGGED_TRANSACTIONS}
+        kycApplications={kycApplications}
+        flaggedTransactions={flagged}
       />
 
       {/* 3. The Toggleable Table Section */}
@@ -64,7 +167,7 @@ export default function CompliancePage() {
                 <UserCheck className="w-4 h-4" />
                 <span>KYC Queue</span>
                 <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-green/10 text-[10px] text-brand-green font-bold">
-                  {MOCK_KYC_APPLICATIONS.length}
+                  {kycApplications.length}
                 </span>
               </div>
             </TabsTrigger>
@@ -79,7 +182,7 @@ export default function CompliancePage() {
                 <AlertTriangle className="w-4 h-4" />
                 <span>Flagged</span>
                 <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive/10 text-[10px] text-destructive font-bold">
-                  {MOCK_FLAGGED_TRANSACTIONS.length}
+                  {flagged.length}
                 </span>
               </div>
             </TabsTrigger>
@@ -103,14 +206,14 @@ export default function CompliancePage() {
         <div className="mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           <TabsContent value="kyc" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <KYCQueue
-              applications={MOCK_KYC_APPLICATIONS}
+              applications={kycApplications}
               onReview={handleReviewKYC}
               onAssign={(id, userId) => console.log('Assign:', id, userId)}
             />
           </TabsContent>
           <TabsContent value="fraud" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <FlaggedTransactions
-              transactions={MOCK_FLAGGED_TRANSACTIONS}
+              transactions={flagged}
               onInvestigate={handleInvestigateTransaction}
               onResolve={(id, resolution) => console.log('Resolve:', id, resolution)}
             />
@@ -123,7 +226,7 @@ export default function CompliancePage() {
         <section className="space-y-4">
           <h3 className="text-lg font-semibold px-1">Global Audit Log</h3>
           <AuditLogTable
-            logs={MOCK_AUDIT_LOGS}
+            logs={auditLogs}
             onExport={(s, e) => console.log('Export:', s, e)}
           />
         </section>
@@ -131,12 +234,14 @@ export default function CompliancePage() {
         <section className="space-y-4">
           <h3 className="text-lg font-semibold px-1">Compliance Reporting</h3>
           <ComplianceReports
-            reports={MOCK_COMPLIANCE_REPORTS}
+            reports={complianceReports}
             onGenerate={(type) => console.log('Generate:', type)}
             onDownload={(id) => console.log('Download:', id)}
           />
         </section>
       </div>
+        </>
+      )}
     </div>
   );
 }

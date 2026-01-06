@@ -18,14 +18,19 @@ import { AnalyticsSummary } from './AnalyticsSummary';
 import { DataExportPanel } from './DataExportPanel';
 import { Badge } from '../ui/badge';
 
-export const AnalyticsDashboard = () => {
+interface AnalyticsDashboardProps {
+  metrics?: any;
+  earnings?: any[];
+}
+
+export const AnalyticsDashboard = ({ metrics, earnings }: AnalyticsDashboardProps) => {
   return (
     <div className="space-y-8">
       {/* Note: We removed the Page Header here as it's now handled 
           by app/analytics/page.tsx. This component starts directly with the data. 
       */}
 
-      <AnalyticsSummary />
+      <AnalyticsSummary metrics={metrics} />
 
       <Tabs defaultValue="prebuilt" className="w-full">
         <div className="flex items-center justify-between mb-6 px-1">

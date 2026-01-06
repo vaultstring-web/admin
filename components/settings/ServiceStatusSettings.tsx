@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { 
-  AlertTriangle, CheckCircle, XCircle, Server, 
+  AlertTriangle, CheckCircle, XCircle, 
   CreditCard, Mail, Bell, Activity, RefreshCw, 
   Clock, ShieldAlert 
 } from 'lucide-react';
@@ -10,11 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 
 export const ServiceStatusSettings = () => {
-  const [services, setServices] = useState([
+  const [services] = useState([
     {
       id: '1',
       name: 'Payment Processing',

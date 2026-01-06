@@ -68,7 +68,7 @@ export const NotificationStats: React.FC<NotificationStatsProps> = ({ notificati
 interface StatCardProps {
   label: string;
   value: number;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   color: 'slate' | 'emerald' | 'blue' | 'indigo' | 'rose';
   pulse?: boolean;
   isWarning?: boolean;

@@ -1,40 +1,198 @@
 // app/dashboard/merchants/page.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import MerchantsList from "@/components/merchants/MerchantList";
 import MerchantDetail from "@/components/merchants/MerchantDetail";
 import { MerchantCard } from "@/components/merchants/MerchantCard";
-import { MOCK_MERCHANTS, SIMPLIFIED_MERCHANTS } from "@/components/merchants/constants";
+import { MOCK_MERCHANTS } from "@/components/merchants/constants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { API_BASE } from "@/lib/constants";
 
 export default function MerchantsPage() {
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
-  
-  // Find the selected merchant
-  const selectedMerchant = selectedMerchantId 
-    ? MOCK_MERCHANTS.find(m => m.id === selectedMerchantId) 
-    : null;
+  const [simpleMerchants, setSimpleMerchants] = useState<Array<{
+    id: string;
+    businessName: string;
+    registrationDate: string;
+    verificationStatus: "pending" | "approved" | "rejected";
+    accountStatus: "active" | "suspended";
+    category: string;
+    contact: string;
+    email: string;
+    phone: string;
+    riskScore: number;
+  }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<{
+    id: string;
+    businessName: string;
+    legalType: string;
+    registrationNumber: string;
+    taxId: string;
+    address: string;
+    contact: string;
+    phone: string;
+    email: string;
+    category: string;
+    registrationDate: string;
+    verificationStatus: "pending" | "approved" | "rejected";
+    accountStatus: "active" | "suspended";
+    riskScore: number;
+    transactionVolume: number;
+    settlementBalance: number;
+    documents: { type: string; status: "verified" | "unverified"; submittedAt: string }[];
+    owners: { name: string; email: string; phone: string; ownershipPercentage: number }[];
+    bankAccounts: { bankName: string; accountNumber: string; accountHolder: string; currency: string; isPrimary: boolean }[];
+  } | null>(null);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null;
+    const mapKYC = (s?: string) => {
+      const v = (s || "").toLowerCase();
+      if (v === "verified") return "approved";
+      if (v === "rejected") return "rejected";
+      return "pending";
+    };
+    const mapAccount = (isActive?: boolean) => (isActive ? "active" : "suspended");
+    const mapRisk = (r: any) =>
+      typeof r === "string"
+        ? Math.min(100, Math.max(0, parseFloat(r)))
+        : typeof r === "number"
+        ? Math.min(100, Math.max(0, r))
+        : 0;
+    const fetchMerchants = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_BASE}/admin/users?limit=100&offset=0`, {
+          headers: token ? { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          } : { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({} as any));
+          throw new Error(data.error || `Fetch failed (${res.status})`);
+        }
+        const data = await res.json();
+        const users = Array.isArray(data.users) ? data.users : [];
+        const merchants = users.filter((u: any) => (u.user_type || "").toLowerCase() === "merchant");
+        const mapped = merchants.map((u: any) => ({
+          id: u.id,
+          businessName: u.business_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Merchant",
+          registrationDate: (u.created_at || "").toString().slice(0, 10),
+          verificationStatus: mapKYC(u.kyc_status) as "pending" | "approved" | "rejected",
+          accountStatus: mapAccount(u.is_active) as "active" | "suspended",
+          category: "E-commerce",
+          contact: `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Contact",
+          email: u.email || "",
+          phone: u.phone || "",
+          riskScore: mapRisk(u.risk_score),
+        }));
+        setSimpleMerchants(mapped);
+      } catch (e: any) {
+        setError(e.message || "Failed to load merchants");
+        const fallback = MOCK_MERCHANTS.map(m => ({
+          id: m.id,
+          businessName: m.businessName,
+          registrationDate: m.registrationDate.split("T")[0],
+          verificationStatus: m.verificationStatus,
+          accountStatus: m.accountStatus,
+          category: m.category,
+          contact: m.contact,
+          email: m.email,
+          phone: m.phone,
+          riskScore: m.riskScore,
+        }));
+        setSimpleMerchants(fallback);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMerchants();
+  }, []);
 
   // Calculate statistics
-  const stats = {
-    totalMerchants: MOCK_MERCHANTS.length,
-    pendingVerification: MOCK_MERCHANTS.filter(m => m.verificationStatus === "pending").length,
-    totalVolume: MOCK_MERCHANTS.reduce((sum, m) => sum + m.transactionVolume, 0),
-    suspendedAccounts: MOCK_MERCHANTS.filter(m => m.accountStatus === "suspended").length,
-  };
+  const stats = useMemo(() => {
+    const totalMerchants = simpleMerchants.length;
+    const pendingVerification = simpleMerchants.filter(m => m.verificationStatus === "pending").length;
+    const suspendedAccounts = simpleMerchants.filter(m => m.accountStatus === "suspended").length;
+    const totalVolume = 0;
+    return { totalMerchants, pendingVerification, totalVolume, suspendedAccounts };
+  }, [simpleMerchants]);
 
   // Handle back from detail view
   const handleBackToList = () => {
     setSelectedMerchantId(null);
+    setSelectedDetail(null);
   };
 
   // Handle merchant selection
   const handleSelectMerchant = (id: string) => {
     setSelectedMerchantId(id);
+    const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null;
+    const sel = simpleMerchants.find(m => m.id === id);
+    setSelectedDetail({
+      id,
+      businessName: sel?.businessName || "Merchant",
+      legalType: "Private Limited Company",
+      registrationNumber: "",
+      taxId: "",
+      address: "",
+      contact: sel?.contact || "",
+      phone: sel?.phone || "",
+      email: sel?.email || "",
+      category: sel?.category || "E-commerce",
+      registrationDate: sel?.registrationDate || "",
+      verificationStatus: sel?.verificationStatus || "pending",
+      accountStatus: sel?.accountStatus || "active",
+      riskScore: sel?.riskScore || 0,
+      transactionVolume: 0,
+      settlementBalance: 0,
+      documents: [],
+      owners: [],
+      bankAccounts: [],
+    });
+    if (!token) return;
+    fetch(`${API_BASE}/admin/users/${id}`, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(u => {
+        if (!u) return;
+        setSelectedDetail(prev => ({
+          id: u.id || prev?.id || id,
+          businessName: u.business_name || prev?.businessName || "Merchant",
+          legalType: "Private Limited Company",
+          registrationNumber: u.business_registration || "",
+          taxId: "",
+          address: "",
+          contact: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+          phone: u.phone || "",
+          email: u.email || "",
+          category: prev?.category || "E-commerce",
+          registrationDate: (u.created_at || "").toString().slice(0, 10),
+          verificationStatus: ((u.kyc_status || "").toLowerCase() === "verified" ? "approved" : (u.kyc_status || "").toLowerCase() === "rejected" ? "rejected" : "pending"),
+          accountStatus: u.is_active ? "active" : "suspended",
+          riskScore: prev?.riskScore ?? 0,
+          transactionVolume: 0,
+          settlementBalance: 0,
+          documents: [],
+          owners: [],
+          bankAccounts: [],
+        }));
+      })
+      .catch(() => {});
   };
 
   // Handle status updates (mock function)
@@ -124,7 +282,7 @@ export default function MerchantsPage() {
               <CardHeader>
                 <CardTitle>Viewing Merchant Detail</CardTitle>
                 <CardDescription>
-                  Currently viewing {selectedMerchant?.businessName}. Use the tabs above to switch views.
+                  Currently viewing {selectedDetail?.businessName}. Use the tabs above to switch views.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -136,13 +294,13 @@ export default function MerchantsPage() {
           ) : (
             <MerchantsList 
               onSelectMerchant={handleSelectMerchant}
-              merchants={SIMPLIFIED_MERCHANTS}
+              merchants={loading ? [] : simpleMerchants}
             />
           )}
         </TabsContent>
         
         <TabsContent value="detail" className="space-y-4">
-          {selectedMerchant ? (
+          {selectedDetail ? (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -150,7 +308,7 @@ export default function MerchantsPage() {
                     <div>
                       <CardTitle>Merchant Details</CardTitle>
                       <CardDescription>
-                        {selectedMerchant.businessName} - {selectedMerchant.id}
+                        {selectedDetail.businessName} - {selectedDetail.id}
                       </CardDescription>
                     </div>
                     <Button variant="outline" onClick={handleBackToList}>
@@ -160,7 +318,7 @@ export default function MerchantsPage() {
                 </CardHeader>
                 <CardContent>
                   <MerchantDetail 
-                    merchant={selectedMerchant}
+                    merchant={selectedDetail}
                     onUpdateStatus={handleUpdateStatus}
                     onBack={handleBackToList}
                   />
@@ -175,7 +333,7 @@ export default function MerchantsPage() {
                   <Button 
                     variant="outline" 
                     className="mt-4"
-                    onClick={() => setSelectedMerchantId(MOCK_MERCHANTS[0].id)}
+                    onClick={() => setSelectedMerchantId(simpleMerchants[0]?.id || "")}
                   >
                     View Sample Merchant
                   </Button>
@@ -195,7 +353,7 @@ export default function MerchantsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {MOCK_MERCHANTS.map((merchant) => (
+                {(loading ? [] : simpleMerchants).map((merchant) => (
                   <MerchantCard
                     key={merchant.id}
                     merchant={{
@@ -204,7 +362,7 @@ export default function MerchantsPage() {
                       verificationStatus: merchant.verificationStatus,
                       accountStatus: merchant.accountStatus,
                       category: merchant.category,
-                      transactionVolume: merchant.transactionVolume,
+                      transactionVolume: 0,
                       riskScore: merchant.riskScore
                     }}
                     onClick={() => handleSelectMerchant(merchant.id)}
