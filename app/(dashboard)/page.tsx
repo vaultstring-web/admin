@@ -32,6 +32,7 @@ export default function DashboardPage() {
           getForexRates(),
         ]);
 
+        
         // Handle errors gracefully
         const usersData = usersResponse.error 
           ? { users: [], total: 0 } 

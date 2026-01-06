@@ -16,6 +16,7 @@ const manrope = Manrope({
   display: "swap",
 })
 
+
 export const metadata: Metadata = {
   title: "VaultString",
   description: "Cross border payment and wallet system",
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
     apple: "/icons/favicon.svg",
   },
 }
+
 
 export default function AuthLayout({
   children,

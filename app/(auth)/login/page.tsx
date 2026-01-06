@@ -31,12 +31,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+
   // Redirect if already authenticated
   if (isAuthenticated && typeof window !== 'undefined') {
     router.push('/');
     return null;
   }
 
+  
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
