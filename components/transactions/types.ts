@@ -10,4 +10,7 @@ export interface Transaction {
   status: 'Completed' | 'Pending' | 'Failed';
   date: Date;
   flagged: boolean;
+  transactionType?: string;
+  direction?: 'sent' | 'received';
+  reference?: string;
 }

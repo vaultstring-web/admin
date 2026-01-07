@@ -16,6 +16,7 @@ export default function TransactionMonitoringPage() {
     search: '',
     status: 'all',
     currency: 'all',
+    type: 'all',
   });
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [flagOpen, setFlagOpen] = useState(false);
@@ -56,25 +57,58 @@ export default function TransactionMonitoringPage() {
         const data = await res.json();
         const txs = Array.isArray(data.transactions) ? data.transactions : [];
         
-        // Map backend transactions to frontend format
+        const ids = new Set<string>();
+        for (const t of txs) {
+          const s = String(t.sender_id || t.senderId || '').trim();
+          const r = String(t.receiver_id || t.receiverId || '').trim();
+          if (s) ids.add(s);
+          if (r) ids.add(r);
+        }
+        const idList = Array.from(ids);
+        const nameMap: Record<string, { name: string; email?: string; type?: string }> = {};
+        const fetchUser = async (id: string) => {
+          const r = await fetch(`${API_BASE}/admin/users/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          });
+          if (r.ok) {
+            const u = await r.json();
+            const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+            nameMap[id] = {
+              name: fullName || u.email || `User-${String(id).slice(0, 8)}`,
+              email: u.email,
+              type: String(u.user_type || '').toLowerCase(),
+            };
+          }
+        };
+        await Promise.all(idList.map(fetchUser));
+
         const mapped: Transaction[] = txs.map((t: any) => {
           const amt = t.amount && typeof t.amount === 'object' ? t.amount.amount : t.amount;
           const cur = t.amount && typeof t.amount === 'object' ? t.amount.currency : t.currency;
           const senderId = String(t.sender_id || t.senderId || '').trim();
           const receiverId = String(t.receiver_id || t.receiverId || '').trim();
+          const senderInfo = senderId ? nameMap[senderId] : undefined;
+          const receiverInfo = receiverId ? nameMap[receiverId] : undefined;
           const fallbackSender = senderId ? `User-${senderId.slice(0, 8)}` : 'Unknown';
           const fallbackReceiver = receiverId ? `User-${receiverId.slice(0, 8)}` : 'Unknown';
+          const txType = String(t.transaction_type || '').toLowerCase();
+          const dir: 'sent' | 'received' =
+            txType === 'deposit' ? 'received' : 'sent';
           return {
             id: t.id || t.transaction_id || '',
-            customer: t.sender_name || t.sender_email || fallbackSender,
-            merchant: t.receiver_name || t.receiver_email || fallbackReceiver,
-            senderType: String(t.sender_user_type || '').toLowerCase() || undefined,
-            receiverType: String(t.receiver_user_type || '').toLowerCase() || undefined,
+            customer: t.sender_name || (senderInfo?.name ?? t.sender_email) || fallbackSender,
+            merchant: t.receiver_name || (receiverInfo?.name ?? t.receiver_email) || fallbackReceiver,
+            senderType: (senderInfo?.type ?? String(t.sender_user_type || '')).toLowerCase() || undefined,
+            receiverType: (receiverInfo?.type ?? String(t.receiver_user_type || '')).toLowerCase() || undefined,
             rawAmount: parseFloat(amt || 0),
             currency: cur || 'MWK',
             status: mapStatus(t.status),
             date: new Date(t.created_at || t.timestamp || Date.now()),
             flagged: t.flagged || false,
+            transactionType: txType,
+            direction: dir,
+            reference: String(t.reference || ''),
           };
         });
 
@@ -104,7 +138,11 @@ export default function TransactionMonitoringPage() {
         tx.merchant.toLowerCase().includes(filters.search.toLowerCase());
       const matchesStatus = filters.status === 'all' || tx.status.toLowerCase() === filters.status.toLowerCase();
       const matchesCurrency = filters.currency === 'all' || tx.currency === filters.currency;
-      return matchesSearch && matchesStatus && matchesCurrency;
+      const matchesType =
+        filters.type === 'all' ||
+        (filters.type === 'sent' && (tx.direction === 'sent')) ||
+        (filters.type === 'received' && (tx.direction === 'received'));
+      return matchesSearch && matchesStatus && matchesCurrency && matchesType;
     });
   }, [transactions, filters]);
 
@@ -176,9 +214,11 @@ export default function TransactionMonitoringPage() {
         search={filters.search}
         status={filters.status}
         currency={filters.currency}
+        type={filters.type}
         onSearchChange={(value) => setFilters({ ...filters, search: value })}
         onStatusChange={(value) => setFilters({ ...filters, status: value })}
         onCurrencyChange={(value) => setFilters({ ...filters, currency: value })}
+        onTypeChange={(value) => setFilters({ ...filters, type: value })}
         onClearFilters={handleClearFilters}
       />
 

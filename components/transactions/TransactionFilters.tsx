@@ -9,9 +9,11 @@ interface TransactionFiltersProps {
   search: string;
   status: string;
   currency: string;
+  type?: string;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onCurrencyChange: (value: string) => void;
+  onTypeChange?: (value: string) => void;
   onClearFilters: () => void;
 }
 
@@ -19,14 +21,16 @@ export function TransactionFilters({
   search,
   status,
   currency,
+  type = 'all',
   onSearchChange,
   onStatusChange,
   onCurrencyChange,
+  onTypeChange,
   onClearFilters
 }: TransactionFiltersProps) {
   return (
     <Card className="mb-6 p-4 bg-white dark:bg-[#1e293b]">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           <Input 
@@ -55,6 +59,16 @@ export function TransactionFilters({
             <SelectItem value="all">All Currencies</SelectItem>
             <SelectItem value="MWK">MWK</SelectItem>
             <SelectItem value="CNY">CNY</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={type} onValueChange={(v) => onTypeChange && onTypeChange(v)}>
+          <SelectTrigger className="bg-white dark:bg-[#334155]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent className="bg-white dark:bg-[#1e293b]">
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="sent">Money Sent</SelectItem>
+            <SelectItem value="received">Money Received</SelectItem>
           </SelectContent>
         </Select>
         <Button

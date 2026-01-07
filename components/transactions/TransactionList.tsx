@@ -39,7 +39,7 @@ export function TransactionList(props: TransactionListProps) {
                 className="group hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all duration-200"
               >
                 <td className="px-6 py-4 font-mono text-xs text-slate-400">
-                  #{tx.id}
+                  #{tx.reference || tx.id}
                 </td>
                 <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                   {tx.customer}
@@ -48,13 +48,18 @@ export function TransactionList(props: TransactionListProps) {
                   {tx.merchant}
                 </td>
                 <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                  {tx.customer}
-                  {tx.senderType ? ` (${tx.senderType})` : ''} sent {tx.currency === 'MWK' ? 'MWK' : '¥'} {formatAmount(tx.rawAmount)} to {tx.merchant}
-                  {tx.receiverType ? ` (${tx.receiverType})` : ''}
+                  {(() => {
+                    const cur = tx.currency === 'MWK' ? 'MK' : tx.currency;
+                    const amt = formatAmount(tx.rawAmount);
+                    if (tx.direction === 'received') {
+                      return `Trans. ID: ${tx.reference || tx.id} ${tx.merchant} received ${cur} ${amt} from Bank Account`;
+                    }
+                    return `Trans. ID: ${tx.reference || tx.id} ${tx.customer} sent ${cur} ${amt} to ${tx.merchant}`;
+                  })()}
                 </td>
                 <td className="px-6 py-4 text-right tabular-nums font-semibold">
                   <span className="text-xs font-normal text-slate-400 mr-1">
-                    {tx.currency === 'MWK' ? 'MWK' : '¥'}
+                    {tx.currency}
                   </span>
                   {formatAmount(tx.rawAmount)}
                 </td>
