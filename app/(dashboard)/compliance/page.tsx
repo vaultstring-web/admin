@@ -77,12 +77,23 @@ export default function CompliancePage() {
           const mapped: ComplianceTx[] = txsRes.data.transactions
             .slice(0, 20)
             .map((t: any) => {
-              const rawAmount = typeof t.amount === 'string' ? parseFloat(t.amount) : typeof t.amount === 'number' ? t.amount : 0;
-              const currency = String(t.currency || 'USD');
+              const rawAmount =
+                t.amount && typeof t.amount === 'object'
+                  ? parseFloat(t.amount.amount || 0)
+                  : typeof t.amount === 'string'
+                  ? parseFloat(t.amount)
+                  : typeof t.amount === 'number'
+                  ? t.amount
+                  : 0;
+              const currency =
+                t.amount && typeof t.amount === 'object'
+                  ? String(t.amount.currency || 'USD')
+                  : String(t.currency || 'USD');
               const id = String(t.id || t.reference || '').trim() || `TX-${Date.now()}`;
               const transactionId = String(t.reference || id);
               const customerId = String(t.sender_id || '');
-              const customerName = customerId ? `User-${customerId.slice(0, 8)}` : 'Unknown';
+              const customerName =
+                t.sender_name || t.sender_email || (customerId ? `User-${customerId.slice(0, 8)}` : 'Unknown');
               const timestamp = String(t.created_at || new Date().toISOString());
               const reason = String(t.status_reason || 'Review required');
               const factors: string[] = [];

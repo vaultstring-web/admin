@@ -25,6 +25,7 @@ export function TransactionList(props: TransactionListProps) {
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 w-16">ID</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Customer</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Merchant</th>
+              <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Summary</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 text-right">Amount</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Status</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Date</th>
@@ -45,6 +46,11 @@ export function TransactionList(props: TransactionListProps) {
                 </td>
                 <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                   {tx.merchant}
+                </td>
+                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                  {tx.customer}
+                  {tx.senderType ? ` (${tx.senderType})` : ''} sent {tx.currency === 'MWK' ? 'MWK' : '¥'} {formatAmount(tx.rawAmount)} to {tx.merchant}
+                  {tx.receiverType ? ` (${tx.receiverType})` : ''}
                 </td>
                 <td className="px-6 py-4 text-right tabular-nums font-semibold">
                   <span className="text-xs font-normal text-slate-400 mr-1">

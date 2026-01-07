@@ -57,16 +57,26 @@ export default function TransactionMonitoringPage() {
         const txs = Array.isArray(data.transactions) ? data.transactions : [];
         
         // Map backend transactions to frontend format
-        const mapped: Transaction[] = txs.map((t: any) => ({
-          id: t.id || t.transaction_id || '',
-          customer: t.sender_name || t.sender_email || 'Unknown',
-          merchant: t.receiver_name || t.receiver_email || 'Unknown',
-          rawAmount: parseFloat(t.amount || 0),
-          currency: t.currency || 'MWK',
-          status: mapStatus(t.status),
-          date: new Date(t.created_at || t.timestamp || Date.now()),
-          flagged: t.flagged || false,
-        }));
+        const mapped: Transaction[] = txs.map((t: any) => {
+          const amt = t.amount && typeof t.amount === 'object' ? t.amount.amount : t.amount;
+          const cur = t.amount && typeof t.amount === 'object' ? t.amount.currency : t.currency;
+          const senderId = String(t.sender_id || t.senderId || '').trim();
+          const receiverId = String(t.receiver_id || t.receiverId || '').trim();
+          const fallbackSender = senderId ? `User-${senderId.slice(0, 8)}` : 'Unknown';
+          const fallbackReceiver = receiverId ? `User-${receiverId.slice(0, 8)}` : 'Unknown';
+          return {
+            id: t.id || t.transaction_id || '',
+            customer: t.sender_name || t.sender_email || fallbackSender,
+            merchant: t.receiver_name || t.receiver_email || fallbackReceiver,
+            senderType: String(t.sender_user_type || '').toLowerCase() || undefined,
+            receiverType: String(t.receiver_user_type || '').toLowerCase() || undefined,
+            rawAmount: parseFloat(amt || 0),
+            currency: cur || 'MWK',
+            status: mapStatus(t.status),
+            date: new Date(t.created_at || t.timestamp || Date.now()),
+            flagged: t.flagged || false,
+          };
+        });
 
         setTransactions(mapped);
       } catch (err: any) {
