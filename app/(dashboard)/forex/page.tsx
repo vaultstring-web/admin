@@ -53,18 +53,10 @@ export default function ForexPage() {
     setLoading(true)
     setError(null)
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null
       const res = await fetch(`${API_BASE}/forex/rates`, {
-        headers: token ? { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        } : { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `Fetch failed (${res.status})`)
-      }
       const data = await res.json()
       const apiRates = Array.isArray(data.rates) ? data.rates : []
       setRates(apiRates)
@@ -86,7 +78,6 @@ export default function ForexPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         credentials: 'include',
         body: JSON.stringify({ amount: amt, from, to }),
@@ -96,10 +87,19 @@ export default function ForexPage() {
         throw new Error(data.error || `Conversion failed (${res.status})`)
       }
       const data = await res.json()
+      const convAmt = typeof data.converted_amount === "number" ? data.converted_amount : parseFloat(String(data.converted_amount || 0))
+      const feeAmtSource = typeof data.fee_amount === "number" ? data.fee_amount : (data.fee_amount != null ? parseFloat(String(data.fee_amount)) : undefined)
+      const rateStr = typeof data.rate === "string" ? data.rate : String(data.rate)
+      const rateNum = parseFloat(rateStr)
+      const feeAmtTarget = feeAmtSource != null && !isNaN(rateNum) ? feeAmtSource * rateNum : undefined
+      const netAmtTarget = feeAmtTarget != null ? Math.max(convAmt - feeAmtTarget, 0) : (typeof data.net_amount === "number" ? data.net_amount : (data.net_amount != null ? parseFloat(String(data.net_amount)) : undefined))
       setConversion({
-        converted_amount: typeof data.converted_amount === "string" ? data.converted_amount : String(data.converted_amount),
-        rate: typeof data.rate === "string" ? data.rate : String(data.rate),
-      })
+        converted_amount: String(convAmt),
+        rate: rateStr,
+        fee_amount: feeAmtTarget != null ? String(feeAmtTarget) : undefined,
+        net_amount: netAmtTarget != null ? String(netAmtTarget) : undefined,
+        spread_pct: data.spread_pct != null ? String(data.spread_pct) : undefined,
+      } as any)
     } catch (err: any) {
       setError(err?.message || "Conversion failed")
     } finally {
@@ -217,11 +217,21 @@ export default function ForexPage() {
           </div>
         </div>
         {conversion && (
-          <div className="mt-3 text-sm">
-            <span className="text-muted-foreground">Converted Amount:</span>{" "}
-            <span className="font-mono">{conversion.converted_amount}</span>{" "}
-            <span className="text-muted-foreground">Rate:</span>{" "}
-            <span className="font-mono">{conversion.rate}</span>
+          <div className="mt-3 text-sm space-y-1">
+            <div><span className="text-muted-foreground">Rate:</span>{" "}
+              <span className="font-mono">{conversion.rate}</span></div>
+            <div><span className="text-muted-foreground">Converted Amount:</span>{" "}
+              <span className="font-mono">{conversion.converted_amount} {to}</span></div>
+            {conversion.fee_amount && (
+              <div><span className="text-muted-foreground">FX Spread (Company Earnings):</span>{" "}
+                <span className="font-mono">{conversion.fee_amount} {to}</span>
+                {conversion.spread_pct && <span className="ml-2 text-xs text-muted-foreground">({conversion.spread_pct}%)</span>}
+              </div>
+            )}
+            {conversion.net_amount && (
+              <div><span className="text-muted-foreground">Recipient Gets (Net):</span>{" "}
+                <span className="font-mono">{conversion.net_amount} {to}</span></div>
+            )}
           </div>
         )}
         {!conversion && error && (

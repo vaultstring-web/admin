@@ -1,19 +1,23 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, ArrowUpRight, Wallet } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from 'recharts';
+import { ArrowUpRight, Wallet } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import type { EarningsReport } from '@/lib/api';
 
-export const RevenueFromFees = () => {
-  const feeData = [
-    { name: 'Transaction Fees', value: 4200000, color: 'var(--color-chart-1)' }, // Brand Green
-    { name: 'Currency Conversion', value: 2800000, color: 'var(--color-chart-2)' }, // Brand Blue
+export const RevenueFromFees = ({ earnings }: { earnings?: EarningsReport[] }) => {
+  const defaultFeeData = [
+    { name: 'Transaction Fees', value: 4200000, color: 'var(--color-chart-1)' },
+    { name: 'Currency Conversion', value: 2800000, color: 'var(--color-chart-2)' },
     { name: 'Withdrawal Fees', value: 1850000, color: 'var(--color-chart-3)' },
     { name: 'Subscriptions', value: 950000, color: 'var(--color-chart-4)' },
     { name: 'Other', value: 450000, color: 'var(--color-chart-5)' },
   ];
 
-  const totalRevenue = feeData.reduce((sum, item) => sum + item.value, 0);
+  const totalEarningsDynamic = earnings?.reduce((sum, r) => sum + (r.total_earnings || 0), 0) || 0;
+  const totalRevenue = (totalEarningsDynamic > 0 ? totalEarningsDynamic : defaultFeeData.reduce((sum, item) => sum + item.value, 0));
+
+  const feeData = defaultFeeData;
 
   return (
     <Card className="border-none shadow-sm bg-card overflow-hidden">

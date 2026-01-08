@@ -86,6 +86,8 @@ export default function TransactionMonitoringPage() {
         const mapped: Transaction[] = txs.map((t: any) => {
           const amt = t.amount && typeof t.amount === 'object' ? t.amount.amount : t.amount;
           const cur = t.amount && typeof t.amount === 'object' ? t.amount.currency : t.currency;
+          const feeAmtRaw = t.fee && typeof t.fee === 'object' ? t.fee.amount : t.fee;
+          const netAmtRaw = t.net_amount && typeof t.net_amount === 'object' ? t.net_amount.amount : t.net_amount;
           const senderId = String(t.sender_id || t.senderId || '').trim();
           const receiverId = String(t.receiver_id || t.receiverId || '').trim();
           const senderInfo = senderId ? nameMap[senderId] : undefined;
@@ -102,6 +104,8 @@ export default function TransactionMonitoringPage() {
             senderType: (senderInfo?.type ?? String(t.sender_user_type || '')).toLowerCase() || undefined,
             receiverType: (receiverInfo?.type ?? String(t.receiver_user_type || '')).toLowerCase() || undefined,
             rawAmount: parseFloat(amt || 0),
+            feeAmount: feeAmtRaw !== undefined ? parseFloat(feeAmtRaw || 0) : undefined,
+            netAmount: netAmtRaw !== undefined ? parseFloat(netAmtRaw || 0) : undefined,
             currency: cur || 'MWK',
             status: mapStatus(t.status),
             date: new Date(t.created_at || t.timestamp || Date.now()),

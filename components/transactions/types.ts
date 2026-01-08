@@ -6,6 +6,8 @@ export interface Transaction {
   senderType?: string;
   receiverType?: string;
   rawAmount: number;
+  feeAmount?: number;
+  netAmount?: number;
   currency: 'MWK' | 'CNY' | string;
   status: 'Completed' | 'Pending' | 'Failed';
   date: Date;

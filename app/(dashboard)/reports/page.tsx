@@ -66,6 +66,11 @@ export default function ReportsPage() {
     fetchData();
   };
 
+  const earningsTotal = earnings.reduce((sum, r) => sum + (r?.total_earnings || 0), 0);
+  const earningsAvg = earnings.length > 0 
+    ? (earnings.reduce((sum, r) => sum + (r?.average_earnings_per_transaction || 0), 0) / earnings.length)
+    : 0;
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 animate-in fade-in duration-700">
       <div className="max-w-7xl mx-auto space-y-10">
@@ -124,6 +129,28 @@ export default function ReportsPage() {
             </Button>
           </div>
         </header>
+
+        {/* Earnings Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-border/50 bg-card p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Fee Earnings (30d)</p>
+            <p className="text-2xl font-black tracking-tight text-foreground mt-1">
+              MK {(earningsTotal / 1_000_000).toFixed(2)}M
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-card p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Avg Earnings / Transaction</p>
+            <p className="text-2xl font-black tracking-tight text-foreground mt-1">
+              MK {earningsAvg.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-card p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Last Updated</p>
+            <p className="text-2xl font-black tracking-tight text-foreground mt-1">
+              {metrics?.last_updated ? new Date(metrics.last_updated).toLocaleString() : '—'}
+            </p>
+          </div>
+        </div>
 
         {/* Stats Overview Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

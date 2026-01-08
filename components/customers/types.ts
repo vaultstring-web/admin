@@ -25,6 +25,7 @@ export interface Customer {
   firstName: string;
   lastName: string;
   email: string;
+  role?: string;
   phone: string;
   registrationDate: string;
   kycStatus: KYCStatus;

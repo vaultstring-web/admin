@@ -171,6 +171,16 @@ export async function deleteUser(id: string, reason?: string): Promise<ApiRespon
   });
 }
 
+export async function updateUserProfile(
+  id: string,
+  updates: Partial<Pick<User, 'first_name' | 'last_name' | 'email' | 'phone' | 'country_code' >>
+): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch(`/admin/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
+}
+
 // ============================================================================
 // TRANSACTION MANAGEMENT API
 // ============================================================================
@@ -186,6 +196,8 @@ export interface Transaction {
   receiver_email?: string;
   amount: string | number;
   currency: string;
+  fee?: { amount: string | number; currency: string } | string | number;
+  net_amount?: { amount: string | number; currency: string } | string | number;
   status: string;
   transaction_type?: string;
   status_reason?: string;

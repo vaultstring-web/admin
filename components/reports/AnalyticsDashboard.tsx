@@ -69,7 +69,7 @@ export const AnalyticsDashboard = ({ metrics, earnings }: AnalyticsDashboardProp
 
             {/* Side Metric - Revenue */}
             <div className="lg:col-span-2">
-              <RevenueFromFees />
+              <RevenueFromFees earnings={earnings} />
             </div>
 
             {/* Row 2: Geospatial & Merchants */}

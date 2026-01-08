@@ -17,6 +17,7 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
   const [searchTerm, setSearchTerm] = useState('');
   const [kycFilter, setKycFilter] = useState<KYCStatus | 'ALL'>('ALL');
   const [accountFilter, setAccountFilter] = useState<AccountStatus | 'ALL'>('ALL');
+  const [roleFilter, setRoleFilter] = useState<string | 'ALL'>('ALL');
   const [sortField, setSortField] = useState<'registrationDate' | 'lastName' | 'riskScore'>('registrationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -30,8 +31,9 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
       
       const matchesKyc = kycFilter === 'ALL' || c.kycStatus === kycFilter;
       const matchesAccount = accountFilter === 'ALL' || c.accountStatus === accountFilter;
+      const matchesRole = roleFilter === 'ALL' || (String(c.role || '').toUpperCase() === String(roleFilter));
 
-      return matchesSearch && matchesKyc && matchesAccount;
+      return matchesSearch && matchesKyc && matchesAccount && matchesRole;
     }).sort((a, b) => {
       let valA, valB;
       
@@ -124,6 +126,19 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
             <option value={AccountStatus.ACTIVE}>Active</option>
             <option value={AccountStatus.BLOCKED}>Blocked</option>
           </select>
+          
+          <select
+            className="block w-full lg:w-auto pl-3 pr-10 py-2 text-sm border border-neutral-light-border dark:border-neutral-dark-border bg-white dark:bg-neutral-dark-surface text-neutral-light-heading dark:text-neutral-dark-heading focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-brand-green rounded-md"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as string | 'ALL')}
+            aria-label="Filter by role"
+          >
+            <option value="ALL">All Roles</option>
+            <option value="INDIVIDUAL">Individual</option>
+            <option value="MERCHANT">Merchant</option>
+            <option value="AGENT">Agent</option>
+            <option value="ADMIN">Admin</option>
+          </select>
         </div>
       </div>
 
@@ -164,6 +179,9 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-neutral-light-text dark:text-neutral-dark-text uppercase tracking-wider">
                   KYC Status
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-neutral-light-text dark:text-neutral-dark-text uppercase tracking-wider">
+                  Role
                 </th>
                 <th 
                   scope="col" 
@@ -236,17 +254,22 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
                         {new Date(customer.registrationDate).toLocaleDateString()}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-start">
-                        <Badge status={customer.kycStatus} type="kyc" />
-                        <Badge status={customer.accountStatus} type="account" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge status={customer.riskScore.toString()} type="risk" />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button 
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-start">
+                      <Badge status={customer.kycStatus} type="kyc" />
+                      <Badge status={customer.accountStatus} type="account" />
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-neutral-light-heading dark:text-neutral-dark-heading">
+                      {String(customer.role || '').toUpperCase() || '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Badge status={customer.riskScore.toString()} type="risk" />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={() => onSelectCustomer(customer.id)}

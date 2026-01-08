@@ -12,10 +12,12 @@ interface CustomerDetailProps {
   customer: Customer;
   onBack: () => void;
   onUpdateStatus: (id: string, newStatus: KYCStatus | AccountStatus, reason?: string) => Promise<void>;
+  onUpdateRole?: (id: string, role: string, reason?: string) => Promise<void>;
+  onUpdateProfile?: (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string }>) => Promise<void>;
   onDelete?: (id: string, reason?: string) => Promise<void>;
 }
 
-export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: CustomerDetailProps) => {
+export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole, onUpdateProfile, onDelete }: CustomerDetailProps) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'kyc' | 'history'>('profile');
   
   // Modal States
@@ -23,6 +25,14 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: C
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [roleUpdating, setRoleUpdating] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>(customer.role || '');
+  const [editMode, setEditMode] = useState(false);
+  const [firstName, setFirstName] = useState(customer.firstName);
+  const [lastName, setLastName] = useState(customer.lastName);
+  const [email, setEmail] = useState(customer.email);
+  const [phone, setPhone] = useState(customer.phone);
+  const [country, setCountry] = useState(customer.address.country);
 
   const handleRejectKYC = async () => {
     if (!reason.trim()) {
@@ -81,6 +91,23 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: C
       } finally {
         setUpdating(false);
       }
+    }
+  };
+
+  const handleSaveRole = async () => {
+    if (!onUpdateRole) return;
+    if (!selectedRole) {
+      alert('Please select a role');
+      return;
+    }
+    setRoleUpdating(true);
+    try {
+      await onUpdateRole(customer.id, selectedRole, reason || undefined);
+    } catch (err) {
+      console.error('Failed to update role:', err);
+    } finally {
+      setRoleUpdating(false);
+      setReason('');
     }
   };
 
@@ -156,8 +183,37 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: C
             </h1>
             <Badge status={customer.kycStatus} type="kyc" />
             <Badge status={customer.accountStatus} type="account" />
+            {customer.role && <Badge status={String(customer.role).toUpperCase()} type="role" />}
           </div>
           <p className="text-neutral-light-text dark:text-neutral-dark-text font-mono text-sm mt-1">ID: {customer.id}</p>
+          <div className="mt-3">
+            <Button variant="outline" size="sm" onClick={() => setEditMode(v => !v)}>
+              {editMode ? 'Cancel Edit' : 'Edit Profile'}
+            </Button>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-xs font-semibold text-neutral-light-text dark:text-neutral-dark-text uppercase tracking-wider">Role</span>
+            <select
+              className="text-sm border border-neutral-light-border dark:border-neutral-dark-border rounded-md bg-white dark:bg-neutral-dark-surface text-neutral-light-heading dark:text-neutral-dark-heading px-2 py-1"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              aria-label="User role"
+            >
+              <option value="">Select role</option>
+              <option value="INDIVIDUAL">Individual</option>
+              <option value="MERCHANT">Merchant</option>
+              <option value="AGENT">Agent</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={handleSaveRole}
+              disabled={roleUpdating || !onUpdateRole}
+            >
+              {roleUpdating ? 'Saving...' : 'Update Role'}
+            </Button>
+          </div>
           <div className="flex flex-wrap gap-4 mt-4 text-sm text-neutral-light-text dark:text-neutral-dark-text">
             <span className="flex items-center gap-1"><Mail className="w-4 h-4"/> {customer.email}</span>
             <span className="flex items-center gap-1"><Phone className="w-4 h-4"/> {customer.phone}</span>
@@ -201,28 +257,65 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onDelete }: C
           {activeTab === 'profile' && (
             <div className="bg-white dark:bg-neutral-dark-surface border border-neutral-light-border dark:border-neutral-dark-border rounded-lg p-6 shadow-sm">
               <h3 className="text-lg font-medium text-neutral-light-heading dark:text-neutral-dark-heading mb-4">Detailed Information</h3>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
-                <div>
-                  <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Full Legal Name</dt>
-                  <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">{customer.firstName} {customer.lastName}</dd>
+              {editMode ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">First Name</label>
+                    <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">Last Name</label>
+                    <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">Email</label>
+                    <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">Phone</label>
+                    <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">Country</label>
+                    <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={country} onChange={(e) => setCountry(e.target.value)} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Button 
+                      variant="primary" 
+                      onClick={async () => {
+                        if (!onUpdateProfile) return;
+                        await onUpdateProfile(customer.id, { first_name: firstName, last_name: lastName, email, phone, country_code: country });
+                        setEditMode(false);
+                      }}
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Date of Birth</dt>
-                  <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">Jan 12, 1985 (39 years old)</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Nationality</dt>
-                  <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">{customer.address.country}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Full Address</dt>
-                  <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">
-                    {customer.address.street}<br/>
-                    {customer.address.city}, {customer.address.zip}<br/>
-                    {customer.address.country}
-                  </dd>
-                </div>
-              </dl>
+              ) : (
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Full Legal Name</dt>
+                    <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">{customer.firstName} {customer.lastName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Date of Birth</dt>
+                    <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">Jan 12, 1985 (39 years old)</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Nationality</dt>
+                    <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">{customer.address.country}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-neutral-light-text dark:text-neutral-dark-text">Full Address</dt>
+                    <dd className="mt-1 text-sm text-neutral-light-heading dark:text-neutral-dark-heading">
+                      {customer.address.street}<br/>
+                      {customer.address.city}, {customer.address.zip}<br/>
+                      {customer.address.country}
+                    </dd>
+                  </div>
+                </dl>
+              )}
             </div>
           )}
 

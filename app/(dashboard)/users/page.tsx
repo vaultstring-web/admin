@@ -13,6 +13,8 @@ import {
   updateKYCStatus,
   getUserActivity,
   deleteUser,
+  updateUserRole,
+  updateUserProfile,
   type User,
 } from '@/lib/api';
 
@@ -65,6 +67,7 @@ export default function UsersPage() {
             firstName: u.first_name || '',
             lastName: u.last_name || '',
             email: u.email,
+            role: (u as any).user_type ? String((u as any).user_type) : undefined,
             phone: u.phone || '',
             registrationDate: u.created_at,
             kycStatus: mapKYC(u.kyc_status),
@@ -150,6 +153,7 @@ export default function UsersPage() {
             firstName: u.first_name || '',
             lastName: u.last_name || '',
             email: u.email,
+            role: (u as any).user_type ? String((u as any).user_type) : undefined,
             phone: u.phone || '',
             registrationDate: u.created_at,
             kycStatus: mapKYC(u.kyc_status),
@@ -263,6 +267,115 @@ export default function UsersPage() {
     }
   };
 
+  // Handle profile edits
+  const handleUpdateProfile = async (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string }>) => {
+    try {
+      const response = await updateUserProfile(id, updates);
+      if (response.error) {
+        alert(`Failed to update profile: ${response.error}`);
+        return;
+      }
+      const userResponse = await getUserById(id);
+      if (userResponse.data) {
+        const u = userResponse.data;
+        const mapKYC = (status?: string): KYCStatus => {
+          switch ((status || '').toLowerCase()) {
+            case 'verified':
+            case 'approved':
+              return KYCStatus.APPROVED;
+            case 'rejected':
+              return KYCStatus.REJECTED;
+            default:
+              return KYCStatus.PENDING;
+          }
+        };
+        const mapAccount = (isActive?: boolean): AccountStatus =>
+          isActive ? AccountStatus.ACTIVE : AccountStatus.BLOCKED;
+        const updatedCustomer: Customer = {
+          id: u.id,
+          firstName: u.first_name || '',
+          lastName: u.last_name || '',
+          email: u.email,
+          role: (u as any).user_type ? String((u as any).user_type) : undefined,
+          phone: u.phone || '',
+          registrationDate: u.created_at,
+          kycStatus: mapKYC(u.kyc_status),
+          accountStatus: mapAccount(u.is_active),
+          riskScore: typeof u.risk_score === 'number' ? Math.min(100, Math.max(0, u.risk_score)) : 0,
+          avatarUrl: '/placeholder-user.jpg',
+          kycDocuments: [],
+          auditLogs: [],
+          address: {
+            street: '',
+            city: '',
+            country: u.country_code || '',
+            zip: '',
+          },
+        };
+        setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
+        if (selectedCustomerId === id) {
+          setSelectedCustomer(updatedCustomer);
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      alert(`Failed to update profile: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
+  // Handle role updates
+  const handleUpdateRole = async (id: string, role: string, reason?: string) => {
+    try {
+      const response = await updateUserRole(id, role, reason);
+      if (response?.error) {
+        alert(`Failed to update role: ${response.error}`);
+        return;
+      }
+      const userResponse = await getUserById(id);
+      if (userResponse.data) {
+        const u = userResponse.data;
+        const mapKYC = (status?: string): KYCStatus => {
+          switch ((status || '').toLowerCase()) {
+            case 'verified':
+            case 'approved':
+              return KYCStatus.APPROVED;
+            case 'rejected':
+              return KYCStatus.REJECTED;
+            default:
+              return KYCStatus.PENDING;
+          }
+        };
+        const mapAccount = (isActive?: boolean): AccountStatus =>
+          isActive ? AccountStatus.ACTIVE : AccountStatus.BLOCKED;
+        const updatedCustomer: Customer = {
+          id: u.id,
+          firstName: u.first_name || '',
+          lastName: u.last_name || '',
+          email: u.email,
+          role: (u as any).user_type ? String((u as any).user_type) : undefined,
+          phone: u.phone || '',
+          registrationDate: u.created_at,
+          kycStatus: mapKYC(u.kyc_status),
+          accountStatus: mapAccount(u.is_active),
+          riskScore: typeof u.risk_score === 'number' ? Math.min(100, Math.max(0, u.risk_score)) : 0,
+          avatarUrl: '/placeholder-user.jpg',
+          kycDocuments: [],
+          auditLogs: [],
+          address: {
+            street: '',
+            city: '',
+            country: u.country_code || '',
+            zip: '',
+          },
+        };
+        setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
+      }
+    } catch (err: any) {
+      console.error('Failed to update role:', err);
+      alert(`Failed to update role: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
   // Handle user deletion
   const handleDeleteUser = async (id: string, reason?: string) => {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
@@ -326,6 +439,8 @@ export default function UsersPage() {
             customer={selectedCustomer}
             onBack={handleBackToList}
             onUpdateStatus={handleUpdateStatus}
+            onUpdateRole={handleUpdateRole}
+            onUpdateProfile={handleUpdateProfile}
             onDelete={handleDeleteUser}
           />
         ) : (

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { API_BASE } from '@/lib/constants';
 import { Shield, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 type LoginResponse = {
   access_token: string;
@@ -20,6 +21,9 @@ type LoginResponse = {
     last_name?: string;
     user_type?: string;
   };
+  mfa_required?: boolean;
+  mfa_token?: string;
+  mfa_delivery?: 'email' | 'sms' | 'app';
 };
 
 export default function LoginPage() {
@@ -30,6 +34,11 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [verifyingMfa, setVerifyingMfa] = useState(false);
 
 
   // Redirect if already authenticated
@@ -38,11 +47,12 @@ export default function LoginPage() {
     return null;
   }
 
-  
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
+    setInfo(null);
 
     try {
       const res = await fetch(`${API_BASE}/auth/login`, {
@@ -72,6 +82,20 @@ export default function LoginPage() {
 
       const data = (await res.json()) as LoginResponse;
 
+      // If backend signals MFA, switch to MFA step without finalizing login
+      if ((data as any)?.mfa_required) {
+        setMfaRequired(true);
+        setMfaToken((data as any)?.mfa_token ?? null);
+        setInfo(
+          ((data as any)?.mfa_delivery === 'sms'
+            ? 'Enter the 6-digit code sent via SMS'
+            : (data as any)?.mfa_delivery === 'email'
+            ? 'Enter the 6-digit code sent to your email'
+            : 'Enter the 6-digit code from your authenticator app') || 'Enter the 6-digit MFA code'
+        );
+        return;
+      }
+
       const token = (data as LoginResponse).access_token;
       const user = (data as LoginResponse).user;
 
@@ -96,6 +120,61 @@ export default function LoginPage() {
       setError(err?.message || 'Login failed. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleVerifyMfa(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setInfo(null);
+    setVerifyingMfa(true);
+    try {
+      if (!mfaCode || mfaCode.replace(/\D/g, '').length < 6) {
+        throw new Error('Please enter a valid 6-digit code');
+      }
+      const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        credentials: 'include',
+        mode: 'cors',
+        body: JSON.stringify({
+          email: email.trim(),
+          code: mfaCode.replace(/\D/g, ''),
+          mfa_token: mfaToken,
+        }),
+      });
+
+      if (!res.ok) {
+        let errorMessage = 'Invalid MFA code';
+        try {
+          const errorData = await res.json();
+          errorMessage = (errorData as any)?.error || errorMessage;
+        } catch {
+          errorMessage = `MFA verify error: ${res.status} ${res.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = (await res.json()) as LoginResponse;
+      const token = data.access_token;
+      const user = data.user;
+      if (!token || !user) {
+        throw new Error('MFA response missing token or user');
+      }
+      const userType = String(user?.user_type || '').toLowerCase();
+      if (userType !== 'admin') {
+        throw new Error('You are not authorized to access the admin dashboard');
+      }
+      login(token, user);
+      router.push('/');
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || 'MFA verification failed. Please try again.');
+    } finally {
+      setVerifyingMfa(false);
     }
   }
 
@@ -174,6 +253,29 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {mfaRequired && (
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    MFA Code
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <InputOTP
+                      maxLength={6}
+                      value={mfaCode}
+                      onChange={setMfaCode}
+                      containerClassName="gap-2"
+                      className="text-base"
+                    >
+                      <InputOTPGroup>
+                        {[0,1,2,3,4,5].map((i) => (
+                          <InputOTPSlot key={i} index={i} />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                </div>
+              )}
+
               {error && (
                 <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                   <p className="text-sm text-red-600 dark:text-red-400 font-medium" role="alert">
@@ -181,24 +283,52 @@ export default function LoginPage() {
                   </p>
                 </div>
               )}
+              {info && !error && (
+                <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
+                    {info}
+                  </p>
+                </div>
+              )}
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 rounded-xl bg-gradient-to-r from-[#448a33] to-[#66b354] hover:from-[#3a7a2b] hover:to-[#5a9f44] text-white font-bold text-base shadow-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2" 
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Signing in...
-                  </span>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
+              {!mfaRequired ? (
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#448a33] to-[#66b354] hover:from-[#3a7a2b] hover:to-[#5a9f44] text-white font-bold text-base shadow-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2" 
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Signing in...
+                    </span>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              ) : (
+                <Button 
+                  type="button"
+                  onClick={handleVerifyMfa}
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-[#448a33] to-[#66b354] hover:from-[#3a7a2b] hover:to-[#5a9f44] text-white font-bold text-base shadow-lg transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-2" 
+                  disabled={verifyingMfa}
+                >
+                  {verifyingMfa ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Verifying...
+                    </span>
+                  ) : (
+                    'Verify Code'
+                  )}
+                </Button>
+              )}
             </form>
 
             <details className="w-full bg-gradient-to-r from-[#f4fef2] to-[#eafdee] border border-dashed border-[#b9ddb2] rounded-md p-3 px-4 mt-2 text-xs text-gray-700 dark:bg-[#244a1a] dark:from-[#244a1a] dark:to-[#192d16] dark:text-gray-300 cursor-pointer select-none group" open={false}>

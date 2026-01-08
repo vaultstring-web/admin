@@ -3,7 +3,7 @@ import { KYCStatus, AccountStatus } from './types';
 
 interface BadgeProps {
   status: KYCStatus | AccountStatus | string;
-  type?: 'kyc' | 'account' | 'risk';
+  type?: 'kyc' | 'account' | 'risk' | 'role';
 }
 
 export const Badge: React.FC<BadgeProps> = ({ status, type = 'kyc' }) => {
@@ -45,6 +45,8 @@ export const Badge: React.FC<BadgeProps> = ({ status, type = 'kyc' }) => {
     } else {
       styles += " bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900";
     }
+  } else if (type === 'role') {
+    styles += " bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20";
   } else {
     styles += " bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
   }

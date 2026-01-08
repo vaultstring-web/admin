@@ -18,6 +18,7 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
     completed: transactions.filter(tx => tx.status === 'Completed').length,
     pending: transactions.filter(tx => tx.status === 'Pending').length,
     totalAmount: transactions.reduce((sum, tx) => sum + tx.rawAmount, 0),
+    totalFees: transactions.reduce((sum, tx) => sum + (tx.feeAmount || 0), 0),
   };
 
   return (
@@ -55,6 +56,13 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
         color="violet"
         isCurrency
         className="lg:col-span-2 shadow-md shadow-violet-500/5 ring-violet-500/20 dark:ring-violet-500/30"
+      />
+      <StatCard 
+        label="Fees Earned" 
+        value={stats.totalFees} 
+        icon={Banknote}
+        color="emerald"
+        isCurrency
       />
     </div>
   );

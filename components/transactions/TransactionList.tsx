@@ -51,10 +51,12 @@ export function TransactionList(props: TransactionListProps) {
                   {(() => {
                     const cur = tx.currency === 'MWK' ? 'MK' : tx.currency;
                     const amt = formatAmount(tx.rawAmount);
+                    const fee = tx.feeAmount !== undefined ? formatAmount(tx.feeAmount) : undefined;
+                    const net = tx.netAmount !== undefined ? formatAmount(tx.netAmount) : undefined;
                     if (tx.direction === 'received') {
-                      return `Trans. ID: ${tx.reference || tx.id} ${tx.merchant} received ${cur} ${amt} from Bank Account`;
+                      return `Trans. ID: ${tx.reference || tx.id} ${tx.merchant} received ${cur} ${amt} from Bank Account${fee ? ` • Fee ${cur} ${fee}` : ''}${net ? ` • Net ${cur} ${net}` : ''}`;
                     }
-                    return `Trans. ID: ${tx.reference || tx.id} ${tx.customer} sent ${cur} ${amt} to ${tx.merchant}`;
+                    return `Trans. ID: ${tx.reference || tx.id} ${tx.customer} sent ${cur} ${amt} to ${tx.merchant}${fee ? ` • Fee ${cur} ${fee}` : ''}${net ? ` • Net ${cur} ${net}` : ''}`;
                   })()}
                 </td>
                 <td className="px-6 py-4 text-right tabular-nums font-semibold">
