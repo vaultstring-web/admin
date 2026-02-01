@@ -148,7 +148,15 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
   );
 };
 
-const DetailItem = ({ icon: Icon, label, value, isMono, isCustom }: any) => (
+type DetailItemProps = {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  value: React.ReactNode | string | number;
+  isMono?: boolean;
+  isCustom?: boolean;
+};
+
+const DetailItem = ({ icon: Icon, label, value, isMono, isCustom }: DetailItemProps) => (
   <div className="p-4 rounded-xl border border-slate-50 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-900/50 group hover:border-emerald-500/20 transition-all">
     <div className="flex items-center gap-2 mb-2">
       <Icon size={12} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />

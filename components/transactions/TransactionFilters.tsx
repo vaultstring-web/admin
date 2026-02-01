@@ -34,7 +34,7 @@ export function TransactionFilters({
         <div className="relative">
           <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           <Input 
-            placeholder="Search ID, customer, merchant..." 
+            placeholder="Search ID, customer, merchant, wallet number..." 
             value={search} 
             onChange={e => onSearchChange(e.target.value)} 
             className="pl-10 bg-white dark:bg-[#334155]" 

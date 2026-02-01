@@ -1,11 +1,16 @@
 // app/components/CustomerList.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Customer, KYCStatus, AccountStatus } from './types';
 import { Search, Filter, ChevronDown, ChevronUp, User as UserIcon, ArrowUpDown } from 'lucide-react';
 import { Badge } from './Badge';
 import { Button } from './Button';
+
+const SortIcon = ({ field, sortField, sortDir }: { field: string; sortField: string; sortDir: 'asc' | 'desc' }) => {
+  if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-20" />;
+  return sortDir === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />;
+};
 
 interface CustomerListProps {
   customers: Customer[];
@@ -21,8 +26,8 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
   const [sortField, setSortField] = useState<'registrationDate' | 'lastName' | 'riskScore'>('registrationDate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const filteredCustomers = useMemo(() => {
-    return customers.filter(c => {
+  const filteredCustomers = customers
+    .filter(c => {
       const matchesSearch = 
         c.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -34,7 +39,8 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
       const matchesRole = roleFilter === 'ALL' || (String(c.role || '').toUpperCase() === String(roleFilter));
 
       return matchesSearch && matchesKyc && matchesAccount && matchesRole;
-    }).sort((a, b) => {
+    })
+    .sort((a, b) => {
       let valA, valB;
       
       switch(sortField) {
@@ -57,7 +63,6 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
       if (valA > valB) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [customers, searchTerm, kycFilter, accountFilter, sortField, sortDir]);
 
   const handleSort = (field: 'registrationDate' | 'lastName' | 'riskScore') => {
     if (sortField === field) {
@@ -66,11 +71,6 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
       setSortField(field);
       setSortDir('desc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-20" />;
-    return sortDir === 'asc' ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />;
   };
 
   return (
@@ -157,7 +157,7 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
                   <div className="flex items-center">
                     Customer 
                     <span aria-hidden="true">
-                      <SortIcon field="lastName" />
+                      <SortIcon field="lastName" sortField={sortField} sortDir={sortDir} />
                     </span>
                   </div>
                 </th>
@@ -173,7 +173,7 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
                   <div className="flex items-center">
                     Registered 
                     <span aria-hidden="true">
-                      <SortIcon field="registrationDate" />
+                      <SortIcon field="registrationDate" sortField={sortField} sortDir={sortDir} />
                     </span>
                   </div>
                 </th>
@@ -192,7 +192,7 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
                   <div className="flex items-center">
                     Risk Score 
                     <span aria-hidden="true">
-                      <SortIcon field="riskScore" />
+                      <SortIcon field="riskScore" sortField={sortField} sortDir={sortDir} />
                     </span>
                   </div>
                 </th>

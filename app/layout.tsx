@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { Inter, Manrope } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { AuthProvider } from "@/contexts/AuthContext"
 import "./globals.css"
@@ -27,6 +26,8 @@ export const metadata: Metadata = {
   },
 }
 
+import { Toaster } from "@/components/ui/toaster"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,9 +40,9 @@ export default function RootLayout({
           <AuthProvider>
             {/* Auth pages are handled by (auth)/layout.tsx, dashboard pages get sidebar/header */}
             {children}
+            <Toaster />
           </AuthProvider>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

@@ -25,6 +25,7 @@ export default function MerchantsPage() {
     email: string;
     phone: string;
     riskScore: number;
+    primaryCurrency: string;
   }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,6 @@ export default function MerchantsPage() {
   } | null>(null);
 
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null;
     const mapKYC = (s?: string) => {
       const v = (s || "").toLowerCase();
       if (v === "verified") return "approved";
@@ -70,10 +70,7 @@ export default function MerchantsPage() {
       setError(null);
       try {
         const res = await fetch(`${API_BASE}/admin/users?limit=100&offset=0`, {
-          headers: token ? { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          } : { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         });
         if (!res.ok) {
@@ -94,6 +91,7 @@ export default function MerchantsPage() {
           email: u.email || "",
           phone: u.phone || "",
           riskScore: mapRisk(u.risk_score),
+          primaryCurrency: String(u.country_code || '').toUpperCase() === 'CN' ? 'CNY' : 'MWK',
         }));
         setSimpleMerchants(mapped);
       } catch (e: any) {
@@ -109,6 +107,7 @@ export default function MerchantsPage() {
           email: m.email,
           phone: m.phone,
           riskScore: m.riskScore,
+          primaryCurrency: 'MWK',
         }));
         setSimpleMerchants(fallback);
       } finally {
@@ -136,7 +135,6 @@ export default function MerchantsPage() {
   // Handle merchant selection
   const handleSelectMerchant = (id: string) => {
     setSelectedMerchantId(id);
-    const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null;
     const sel = simpleMerchants.find(m => m.id === id);
     setSelectedDetail({
       id,
@@ -158,13 +156,12 @@ export default function MerchantsPage() {
       documents: [],
       owners: [],
       bankAccounts: [],
+      // propagate primary currency into detail view
+      // @ts-expect-error optional field handled in component
+      primaryCurrency: sel?.primaryCurrency
     });
-    if (!token) return;
     fetch(`${API_BASE}/admin/users/${id}`, {
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     })
       .then(r => r.ok ? r.json() : null)

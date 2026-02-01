@@ -36,14 +36,15 @@ interface MerchantDetailProps {
       phone: string;
       ownershipPercentage: number;
     }>;
-    bankAccounts: Array<{
-      bankName: string;
-      accountNumber: string;
-      accountHolder: string;
-      currency: string;
-      isPrimary: boolean;
-    }>;
-  };
+  bankAccounts: Array<{
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+    currency: string;
+    isPrimary: boolean;
+  }>;
+  primaryCurrency?: string;
+};
   onUpdateStatus: (id: string, action: string, reason?: string) => void;
   onBack: () => void;
 }
@@ -157,6 +158,12 @@ export default function MerchantDetail({ merchant, onUpdateStatus, onBack }: Mer
                       <span className="text-sm font-medium">Category: </span>
                       <Badge variant="outline">{merchant.category}</Badge>
                     </div>
+                    {merchant.primaryCurrency && (
+                      <div>
+                        <span className="text-sm font-medium">Primary Currency: </span>
+                        <Badge variant="outline">{merchant.primaryCurrency}</Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
 

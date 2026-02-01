@@ -2,9 +2,10 @@
 
 import { TrendingUp, TrendingDown, Users, Currency, CreditCard, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { SystemMetrics } from '@/lib/api';
 
 interface AnalyticsSummaryProps {
-  metrics?: any;
+  metrics?: SystemMetrics;
 }
 
 export const AnalyticsSummary = ({ metrics: systemMetrics }: AnalyticsSummaryProps = {}) => {

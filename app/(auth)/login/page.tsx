@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { API_BASE } from '@/lib/constants';
 import { Shield, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'next/navigation';
 
 type LoginResponse = {
   access_token: string;
@@ -21,14 +23,13 @@ type LoginResponse = {
     last_name?: string;
     user_type?: string;
   };
-  mfa_required?: boolean;
-  mfa_token?: string;
-  mfa_delivery?: 'email' | 'sms' | 'app';
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const { login, isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const { login, isAuthenticated, refreshUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -40,11 +41,35 @@ export default function LoginPage() {
   const [mfaCode, setMfaCode] = useState('');
   const [verifyingMfa, setVerifyingMfa] = useState(false);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
 
-  // Redirect if already authenticated
-  if (isAuthenticated && typeof window !== 'undefined') {
-    router.push('/');
-    return null;
+  useEffect(() => {
+    if (searchParams.get('expired') === 'true') {
+      toast({
+        variant: "destructive",
+        title: "Session Expired",
+        description: "Please log in again."
+      });
+    } else if (searchParams.get('logout') === 'true') {
+      toast({
+        title: "Logged Out",
+        description: "Successfully logged out.",
+        variant: "default"
+      });
+    }
+  }, [searchParams, toast]);
+
+  // If authenticated, show loader while redirecting
+  if (isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
 
@@ -66,42 +91,30 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: email.trim(),
           password: password.trim(),
+          totp_code: mfaRequired ? mfaCode.replace(/\D/g, '') : undefined,
         }),
       });
 
       if (!res.ok) {
-        let errorMessage = 'Invalid email or password';
+        // Handle TOTP requirement
         try {
           const errorData = await res.json();
-          errorMessage = (errorData as any)?.error || errorMessage;
+          const err = (errorData as any)?.error;
+          if (res.status === 401 && err === 'totp_required') {
+            setMfaRequired(true);
+            setInfo('Enter the 6-digit code from your authenticator app');
+            setSubmitting(false);
+            return;
+          }
+          throw new Error(err || `Server error: ${res.status} ${res.statusText}`);
         } catch {
-          errorMessage = `Server error: ${res.status} ${res.statusText}`;
+          throw new Error(`Server error: ${res.status} ${res.statusText}`);
         }
-        throw new Error(errorMessage);
       }
 
       const data = (await res.json()) as LoginResponse;
 
-      // If backend signals MFA, switch to MFA step without finalizing login
-      if ((data as any)?.mfa_required) {
-        setMfaRequired(true);
-        setMfaToken((data as any)?.mfa_token ?? null);
-        setInfo(
-          ((data as any)?.mfa_delivery === 'sms'
-            ? 'Enter the 6-digit code sent via SMS'
-            : (data as any)?.mfa_delivery === 'email'
-            ? 'Enter the 6-digit code sent to your email'
-            : 'Enter the 6-digit code from your authenticator app') || 'Enter the 6-digit MFA code'
-        );
-        return;
-      }
-
-      const token = (data as LoginResponse).access_token;
       const user = (data as LoginResponse).user;
-
-      if (!token) {
-        throw new Error('Login response missing access token');
-      }
 
       const userType = String(user?.user_type || '').toLowerCase();
       if (userType !== 'admin') {
@@ -110,14 +123,26 @@ export default function LoginPage() {
 
       // Use auth context to set auth state
       if (user) {
-        login(token, user);
+        login(user);
+        await refreshUser();
       }
+
+      toast({
+        title: "Login Successful",
+        description: "Welcome back to VaultString Admin",
+        variant: "default"
+      });
 
       // Redirect to dashboard
       router.push('/');
     } catch (err: any) {
       console.error(err);
       setError(err?.message || 'Login failed. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: err?.message || 'Login failed. Please try again.'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +157,8 @@ export default function LoginPage() {
       if (!mfaCode || mfaCode.replace(/\D/g, '').length < 6) {
         throw new Error('Please enter a valid 6-digit code');
       }
-      const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
+      // Re-submit login with TOTP code
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,37 +168,39 @@ export default function LoginPage() {
         mode: 'cors',
         body: JSON.stringify({
           email: email.trim(),
-          code: mfaCode.replace(/\D/g, ''),
-          mfa_token: mfaToken,
+          password: password.trim(),
+          totp_code: mfaCode.replace(/\D/g, ''),
         }),
       });
-
       if (!res.ok) {
-        let errorMessage = 'Invalid MFA code';
-        try {
-          const errorData = await res.json();
-          errorMessage = (errorData as any)?.error || errorMessage;
-        } catch {
-          errorMessage = `MFA verify error: ${res.status} ${res.statusText}`;
-        }
-        throw new Error(errorMessage);
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any)?.error || `Server error: ${res.status} ${res.statusText}`);
       }
-
       const data = (await res.json()) as LoginResponse;
-      const token = data.access_token;
       const user = data.user;
-      if (!token || !user) {
-        throw new Error('MFA response missing token or user');
+      if (!user) {
+        throw new Error('Login response missing user');
       }
       const userType = String(user?.user_type || '').toLowerCase();
       if (userType !== 'admin') {
         throw new Error('You are not authorized to access the admin dashboard');
       }
-      login(token, user);
+      login(user);
+      await refreshUser();
+      toast({
+        title: "Login Successful",
+        description: "Welcome back to VaultString Admin",
+        variant: "default"
+      });
       router.push('/');
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || 'MFA verification failed. Please try again.');
+      setError(err?.message || 'Verification failed. Please try again.');
+      toast({
+        variant: "destructive",
+        title: "Verification Failed",
+        description: err?.message || 'Verification failed. Please try again.'
+      });
     } finally {
       setVerifyingMfa(false);
     }
@@ -347,5 +375,17 @@ export default function LoginPage() {
       </p>
     </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -2,82 +2,74 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { User, getToken, getUser, setAuth, clearAuth, validateSession, logout as logoutUtil, isAdmin } from '@/lib/auth';
+import { API_BASE } from '@/lib/constants';
+import { User, getUser, setAuth, validateSession, logout as logoutUtil, isAdmin } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, user: User) => void;
+  login: (user: User) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
-  const login = useCallback((newToken: string, newUser: User) => {
-    setAuth(newToken, newUser);
-    setToken(newToken);
+  const login = useCallback((newUser: User) => {
+    setAuth(newUser);
     setUser(newUser);
   }, []);
 
   const logout = useCallback(async () => {
     await logoutUtil();
-    setToken(null);
     setUser(null);
   }, []);
 
   const refreshSession = useCallback(async () => {
-    const currentToken = getToken();
     const currentUser = getUser();
     
-    if (!currentToken || !currentUser) {
-      setToken(null);
+    if (!currentUser) {
       setUser(null);
       setIsLoading(false);
       return;
     }
 
-    // Set token and user immediately from storage (optimistic)
-    setToken(currentToken);
+    // Set user immediately from storage (optimistic)
     setUser(currentUser);
     setIsLoading(false);
 
-    // Validate in background (non-blocking)
+    // Validate in background
     try {
       const { valid, user: validatedUser } = await validateSession();
       if (valid && validatedUser) {
         // Update with validated user if available
         setUser(validatedUser);
       } else if (!valid) {
-        // Only clear if we get a definitive invalid response
-        // Check if it's a 401 (actual session expired)
-        // For now, keep the session unless explicitly invalidated
-        console.warn('Session validation returned invalid, but keeping session active');
+        // Session invalid/expired - force logout
+        setUser(null);
+        router.push('/login');
       }
     } catch (error) {
       console.error('Session refresh error (non-critical):', error);
       // Don't clear session on validation errors - keep it active
     }
-  }, [pathname, router]);
+  }, []);
 
   // Initialize auth state on mount
   useEffect(() => {
     const initAuth = () => {
-      const currentToken = getToken();
       const currentUser = getUser();
 
-      if (currentToken && currentUser) {
+      if (currentUser) {
         // Set immediately from storage - don't wait for validation
-        setToken(currentToken);
         setUser(currentUser);
         setIsLoading(false);
         
@@ -100,7 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Auto-refresh session every 15 minutes (less aggressive)
   useEffect(() => {
-    if (!token) return;
+    const currentUser = getUser();
+    if (!currentUser) return;
 
     const interval = setInterval(() => {
       // Background validation - doesn't affect active session
@@ -111,21 +104,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, 15 * 60 * 1000); // 15 minutes
 
     return () => clearInterval(interval);
-  }, [token, refreshSession]);
+  }, [refreshSession]);
 
   // Check admin access on protected routes (only redirect if definitely not authenticated)
   useEffect(() => {
     if (isLoading) return;
     
     if (pathname && !pathname.startsWith('/login')) {
-      const currentToken = getToken();
       const currentUser = getUser();
       
       // Use stored values if context values aren't set yet
-      const activeToken = token || currentToken;
       const activeUser = user || currentUser;
       
-      if (!activeToken || !activeUser) {
+      if (!activeUser) {
         router.push('/login');
         return;
       }
@@ -135,16 +126,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
     }
-  }, [token, user, isLoading, pathname, router]);
+  }, [user, isLoading, pathname, router]);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('vs_token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const freshUser = data.user || data;
+        setUser(freshUser);
+        setAuth(freshUser);
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+  }, []);
 
   const value: AuthContextType = {
     user,
-    token,
-    isAuthenticated: !!token && !!user && isAdmin(),
+    isAuthenticated: !!user && isAdmin(),
     isLoading,
     login,
     logout,
     refreshSession,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

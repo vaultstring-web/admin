@@ -128,6 +128,18 @@ export const KpiSummary: React.FC<KpiSummaryProps> = ({ data }) => {
         </div>
       </Card>
 
+      {/* Earnings - Green (Primary) */}
+      <Card className="hover:border-[#448a33]/30 transition-colors">
+        <StatItem 
+          label="Total Earnings" 
+          value={formatCurrency(data.earnings.total, data.earnings.currency)} 
+          trend={data.earnings.trend}
+          icon={<CreditCard />}
+          variant="primary"
+          sublabel="From transaction fees"
+        />
+      </Card>
+
       {/* MWK Volume - Green (Primary) */}
       <Card className="hover:border-[#448a33]/30 transition-colors">
         <StatItem 

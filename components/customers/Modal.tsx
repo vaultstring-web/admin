@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
+import { useCallback } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -21,28 +22,25 @@ export const Modal = ({
   footer, 
   type = 'default' 
 }: ModalProps) => {
-  if (!isOpen) return null;
-
   // Handle Escape key press
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose();
     }
-  };
+  }, [onClose]);
 
   // Add/remove event listener for Escape key
   React.useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      // Prevent scrolling when modal is open
-      document.body.style.overflow = 'hidden';
-    }
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = isOpen ? 'hidden' : 'unset';
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, handleKeyDown]);
+
+  if (!isOpen) return null;
 
   return (
     <div 

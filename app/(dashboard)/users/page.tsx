@@ -25,6 +25,11 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [total, setTotal] = useState(0);
+
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
       setLoading(false);
@@ -53,12 +58,17 @@ export default function UsersPage() {
       setError(null);
       
       try {
-        const response = await getUsers(100, 0);
+        const offset = (page - 1) * limit;
+        const response = await getUsers(limit, offset);
         
         if (response.error) {
           setError(response.error);
           setCustomers([]);
           return;
+        }
+
+        if (response.data?.total !== undefined) {
+           setTotal(response.data.total);
         }
 
         if (response.data?.users) {
@@ -102,7 +112,7 @@ export default function UsersPage() {
     };
 
     fetchUsers();
-  }, [sessionLoading, isAuthenticated]);
+  }, [sessionLoading, isAuthenticated, page, limit]);
 
   // Find the selected customer or fetch it
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -268,7 +278,7 @@ export default function UsersPage() {
   };
 
   // Handle profile edits
-  const handleUpdateProfile = async (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string }>) => {
+  const handleUpdateProfile = async (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string; password: string }>) => {
     try {
       const response = await updateUserProfile(id, updates);
       if (response.error) {
@@ -449,6 +459,66 @@ export default function UsersPage() {
             onSelectCustomer={setSelectedCustomerId}
             loading={loading}
           />
+        )}
+
+        {/* Pagination Controls */}
+        {!selectedCustomerId && !loading && customers.length > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+            <div className="flex flex-1 justify-between sm:hidden">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * limit >= total || loading}
+                className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Showing <span className="font-medium">{Math.min(total, (page - 1) * limit + 1)}</span> to <span className="font-medium">{Math.min(total, page * limit)}</span> of{' '}
+                  <span className="font-medium">{total}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1 || loading}
+                    className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <button
+                    disabled
+                    className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0 dark:text-white dark:ring-gray-600"
+                  >
+                    {page}
+                  </button>
+                  <button
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page * limit >= total || loading}
+                    className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
+                  >
+                    <span className="sr-only">Next</span>
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Stats Footer */}

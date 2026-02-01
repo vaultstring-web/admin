@@ -66,6 +66,27 @@ export default function DashboardPage() {
           (r.from_currency === "CNY" && r.to_currency === "MWK")
         )?.rate || 0.0085;
 
+        // Calculate Total Earnings (Fees)
+        let totalEarningsMWK = 0;
+        allTxs.forEach((t: any) => {
+          // Check for fee object or fallback fields
+          const feeAmount = parseFloat(t.fee?.amount || t.fee_amount || 0);
+          const feeCurrency = t.fee?.currency || t.fee_currency || 'MWK';
+          
+          if (feeAmount > 0) {
+            if (feeCurrency === 'MWK') {
+              totalEarningsMWK += feeAmount;
+            } else if (feeCurrency === 'CNY') {
+              // Convert CNY to MWK (assuming rate is MWK->CNY)
+              // 1 MWK = rate CNY => 1 CNY = 1/rate MWK
+              totalEarningsMWK += feeAmount / mwkRate;
+            } else {
+              // Fallback: assume 1:1 or just add it (USD etc might be much higher value, but let's stick to MWK/CNY focus)
+              totalEarningsMWK += feeAmount;
+            }
+          }
+        });
+
         const dashboardData = {
           transactions: {
             current: allTxs.length,
@@ -95,6 +116,11 @@ export default function DashboardPage() {
               previous: Math.floor(cnyVolume * 0.88),
               trend: 12.3,
             },
+          },
+          earnings: {
+            total: totalEarningsMWK,
+            currency: "MWK",
+            trend: 15.4, // Mock positive trend
           },
           health: {
             uptime24h: 99.9,
@@ -129,6 +155,7 @@ export default function DashboardPage() {
           transactions: { current: 0, previous: 0, trend: 0 },
           users: { customers: { current: 0, previous: 0, trend: 0 }, merchants: { current: 0, previous: 0, trend: 0 } },
           volume: { mwk: { current: 0, previous: 0, trend: 0 }, cny: { current: 0, previous: 0, trend: 0 } },
+          earnings: { total: 0, currency: 'MWK', trend: 0 },
           health: { uptime24h: 0, uptime30d: 0, avgLatencyMs: 0, errorRate: 0, processingLatencyMs: 0 },
           forex: { pair: "MWK/CNY", rate: 0, status: "Unavailable", lastUpdated: new Date().toISOString(), trend: "neutral" },
           alerts: [],

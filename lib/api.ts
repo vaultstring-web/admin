@@ -5,12 +5,20 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   message?: string;
+  validation_errors?: Record<string, string>;
 }
 
 // Get authentication token
 function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('vs_token');
+}
+
+// Get CSRF token from cookie
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )csrf_token=([^;]+)'));
+  return match ? match[2] : null;
 }
 
 // Check if we need to redirect to login
@@ -37,6 +45,14 @@ async function apiFetch<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // CSRF Handling
+  if (typeof document !== 'undefined') {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
@@ -50,6 +66,9 @@ async function apiFetch<T>(
     if (response.status === 401) {
       // Don't auto-redirect here - let the component handle it
       // This prevents immediate logout on temporary issues
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?expired=true';
+      }
       return {
         error: 'Session expired. Please login again.',
       };
@@ -59,6 +78,7 @@ async function apiFetch<T>(
       const errorData = await response.json().catch(() => ({}));
       return {
         error: errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+        validation_errors: errorData.validation_errors,
       };
     }
 
@@ -94,6 +114,7 @@ export interface User {
   country_code?: string;
   created_at: string;
   updated_at?: string;
+  password?: string; // For updates only
 }
 
 export interface UsersResponse {
@@ -173,7 +194,7 @@ export async function deleteUser(id: string, reason?: string): Promise<ApiRespon
 
 export async function updateUserProfile(
   id: string,
-  updates: Partial<Pick<User, 'first_name' | 'last_name' | 'email' | 'phone' | 'country_code' >>
+  updates: Partial<Pick<User, 'first_name' | 'last_name' | 'email' | 'phone' | 'country_code' | 'password'>>
 ): Promise<ApiResponse<{ message: string }>> {
   return apiFetch(`/admin/users/${id}`, {
     method: 'PATCH',
@@ -508,5 +529,27 @@ export async function getComplianceReports(
   return apiFetch<{ reports: ComplianceReport[]; total?: number }>(
     `/admin/compliance/reports?limit=${limit}&offset=${offset}`
   );
+}
+
+// ============================================================================
+// WALLET MANAGEMENT API
+// ============================================================================
+
+export interface Wallet {
+  id: string;
+  user_id: string;
+  wallet_address?: string;
+  currency: string;
+  status: string;
+  created_at: string;
+}
+
+export interface WalletsResponse {
+  addresses: Wallet[];
+  total: number;
+}
+
+export async function getUserWallets(userId: string): Promise<ApiResponse<WalletsResponse>> {
+  return apiFetch<WalletsResponse>(`/admin/blockchain/wallets?user_id=${userId}`);
 }
 

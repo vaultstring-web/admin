@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Download, Filter, FileText, Calendar as CalendarIcon, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Download, Filter, FileText, CheckCircle2, ChevronRight } from 'lucide-react';
 
 export const CustomReportBuilder = () => {
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);

@@ -11,16 +11,11 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
 
-// Get token from localStorage
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('vs_token');
-}
+// Cookie-based auth: tokens are httpOnly cookies; no local token storage
 
 // Get user from localStorage
 export function getUser(): User | null {
@@ -34,43 +29,29 @@ export function getUser(): User | null {
   }
 }
 
-// Set token and user
-export function setAuth(token: string, user: User): void {
+// Set user only (cookie carries the token)
+export function setAuth(user: User): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem('vs_token', token);
   localStorage.setItem('vs_user', JSON.stringify(user));
-  // Also set cookie for middleware
-  document.cookie = `vs_token=${token}; Path=/; SameSite=Lax; Max-Age=86400`;
 }
 
 // Clear auth data
 export function clearAuth(): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem('vs_token');
   localStorage.removeItem('vs_user');
-  // Clear cookie
-  document.cookie = 'vs_token=; Path=/; SameSite=Lax; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 }
 
-// Validate token with backend (non-destructive - only clears on definitive 401)
+// Validate token with backend and handle definitive invalid sessions
 export async function validateSession(): Promise<{ valid: boolean; user?: User }> {
-  const token = getToken();
-  if (!token) {
-    return { valid: false };
-  }
-
   try {
     const response = await fetch(`${API_BASE}/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     });
 
-    // Only clear auth on definitive 401 Unauthorized
+    // Definitive 401 -> clear session
     if (response.status === 401) {
-      // Don't clear here - let the caller decide
+      // Do not clear immediately; allow local user cache as a fallback
       return { valid: false };
     }
 
@@ -94,7 +75,6 @@ export async function validateSession(): Promise<{ valid: boolean; user?: User }
 
     return { valid: true, user };
   } catch (error) {
-    console.error('Session validation error:', error);
     // On network errors, assume session is still valid (don't clear auth)
     // Return stored user as valid
     const storedUser = getUser();
@@ -107,28 +87,17 @@ export async function validateSession(): Promise<{ valid: boolean; user?: User }
 
 // Logout function - only called when user explicitly clicks logout
 export async function logout(): Promise<void> {
-  const token = getToken();
-  
   // Always clear local auth data first
   clearAuth();
   
   // Call backend logout endpoint if available (non-blocking)
-  if (token) {
-    try {
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      }).catch(() => {
-        // Ignore errors - we've already cleared local auth
-      });
-    } catch (error) {
-      // Ignore errors - we've already cleared local auth
-    }
-  }
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+    }).catch(() => {});
+  } catch (error) {}
 }
 
 // Check if user is admin

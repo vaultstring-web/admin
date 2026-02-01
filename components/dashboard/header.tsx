@@ -25,13 +25,13 @@ export function DashboardHeader() {
       await logout()
       // Use window.location for hard redirect to ensure clean state
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/login?logout=true'
       }
     } catch (error) {
       console.error('Logout error:', error)
       // Force redirect even if logout fails
       if (typeof window !== 'undefined') {
-        window.location.href = '/login'
+        window.location.href = '/login?logout=true'
       }
     }
   }

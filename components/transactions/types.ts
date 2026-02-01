@@ -5,6 +5,10 @@ export interface Transaction {
   merchant: string;
   senderType?: string;
   receiverType?: string;
+  senderWalletNumber?: string;
+  receiverWalletNumber?: string;
+  riskScore?: number;
+  riskLevel?: 'Low' | 'Medium' | 'High';
   rawAmount: number;
   feeAmount?: number;
   netAmount?: number;

@@ -46,6 +46,11 @@ export interface DashboardData {
   transactions: KPIValue;
   users: UserMetrics;
   volume: VolumeData;
+  earnings: {
+    total: number;
+    currency: string;
+    trend: number;
+  };
   health: HealthMetrics;
   forex: ForexRate;
   alerts: Alert[];

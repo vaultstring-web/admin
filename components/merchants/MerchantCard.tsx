@@ -14,6 +14,7 @@ interface MerchantCardProps {
     category: string;
     transactionVolume: number;
     riskScore: number;
+    primaryCurrency?: string;
   };
   onClick: () => void;
 }
@@ -91,6 +92,14 @@ export function MerchantCard({ merchant, onClick }: MerchantCardProps) {
               {merchant.category}
             </Badge>
           </div>
+          {merchant.primaryCurrency && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Primary Currency</span>
+              <Badge variant="outline" className="text-xs">
+                {merchant.primaryCurrency}
+              </Badge>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Volume</span>
             <div className="flex items-center gap-1">

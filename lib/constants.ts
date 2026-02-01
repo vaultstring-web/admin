@@ -56,4 +56,6 @@ export const NAV_GROUPS = {
   },
 }
 
-export const API_BASE = `${process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:9000'}/api/v1`
+export const API_BASE = typeof window === 'undefined'
+  ? (process.env.GATEWAY_INTERNAL_URL || process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://127.0.0.1:9000') + '/api/v1'
+  : '/api/v1';

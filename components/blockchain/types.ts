@@ -27,7 +27,7 @@ export interface Transaction {
   timestamp: string;
   chaincode: string;
   blockNumber: number;
-  payload?: Record<string, any>;
+  payload?: JsonObject;
   channel?: string;
   gasUsed?: number;
   gasPrice?: number;
@@ -42,4 +42,10 @@ export interface VerificationResult {
   onChainHash: string;
   referenceHash: string;
   timestamp: string;
+}
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export interface JsonObject {
+  [key: string]: JsonValue;
 }

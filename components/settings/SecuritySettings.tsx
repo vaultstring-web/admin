@@ -1,16 +1,183 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, Key, Globe, Plus, Trash2, Save } from 'lucide-react';
+import { Shield, Key, Globe, Plus, Trash2, Save, LockKeyhole, Copy } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { API_BASE } from '@/lib/constants';
 
 export const SecuritySettings = () => {
+  const [totpUrl, setTotpUrl] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpError, setTotpError] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  async function loadStatus() {
+    setStatusLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/totp/status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTotpEnabled(Boolean(data?.enabled));
+      }
+    } finally {
+      setStatusLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  async function setupTOTP() {
+    setTotpError(null);
+    setTotpLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/totp/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Failed to setup TOTP');
+      }
+      const data = await res.json();
+      setTotpUrl(data?.otp_url || null);
+    } catch (e: unknown) {
+      setTotpError(e instanceof Error ? e.message : 'TOTP setup failed');
+    } finally {
+      setTotpLoading(false);
+    }
+  }
+
+  async function verifyTOTP() {
+    setTotpError(null);
+    setTotpLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/totp/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ code: totpCode.replace(/\D/g, '') }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Invalid code');
+      }
+      setTotpEnabled(true);
+      setTotpUrl(null);
+      setTotpCode('');
+    } catch (e: unknown) {
+      setTotpError(e instanceof Error ? e.message : 'Verification failed');
+    } finally {
+      setTotpLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-3 duration-700">
+      {/* Section 0: Admin 2FA (TOTP) */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-brand-green font-semibold uppercase tracking-tighter text-[10px]">
+            <LockKeyhole className="h-3 w-3" />
+            Two-Factor
+          </div>
+          <h3 className="text-lg font-bold">Admin TOTP Verification</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Protect admin access with an authenticator app. Generate a setup link, scan it, and verify your 6-digit code.
+          </p>
+        </div>
+        <div className="lg:col-span-2 space-y-6 bg-muted/20 p-6 rounded-2xl border border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Status</Label>
+              <p className="text-xs text-muted-foreground">{statusLoading ? 'Loading…' : (totpEnabled ? 'Enabled' : 'Disabled')}</p>
+            </div>
+            <Button
+              onClick={setupTOTP}
+              disabled={totpLoading || totpEnabled}
+              className="bg-brand-green hover:bg-brand-green/90"
+            >
+              {totpLoading ? 'Generating…' : (totpEnabled ? 'Already Enabled' : 'Generate Setup Link')}
+            </Button>
+          </div>
+          {totpError && (
+            <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+              {totpError}
+            </div>
+          )}
+          {totpUrl && (
+            <div className="space-y-3">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Provisioning URL
+              </Label>
+              <div className="flex items-center justify-between bg-background p-3 rounded-xl border border-border/40">
+                <code className="text-xs font-mono break-all">{totpUrl}</code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigator.clipboard.writeText(totpUrl)}
+                  className="h-8 w-8"
+                  title="Copy URL"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Open your authenticator app and add an account using this link. Then enter the 6-digit code below.
+              </p>
+              <div className="space-y-4">
+                <InputOTP
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={setTotpCode}
+                  className="justify-start"
+                >
+                  <InputOTPGroup>
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={verifyTOTP}
+                    disabled={totpLoading || totpCode.replace(/\D/g, '').length !== 6}
+                    className="bg-brand-blue hover:bg-brand-blue/90"
+                  >
+                    Verify Code
+                  </Button>
+                  {totpEnabled && (
+                    <span className="text-xs font-medium text-brand-green">Enabled</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
       
       {/* Section 1: Session & JWT */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -194,7 +194,12 @@ export const VerificationSection: React.FC = () => {
   );
 };
 
-const ProtocolStep = ({ icon: Icon, text }: { icon: any, text: string }) => (
+type ProtocolStepProps = {
+  icon: React.ComponentType<{ className?: string }>;
+  text: string;
+};
+
+const ProtocolStep = ({ icon: Icon, text }: ProtocolStepProps) => (
   <div className="flex items-center gap-3 text-emerald-50 group">
     <div className="p-1.5 rounded-lg bg-white/10 group-hover:bg-white/20 transition-colors">
       <Icon className="h-3 w-3 text-white" />

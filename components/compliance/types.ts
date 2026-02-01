@@ -78,8 +78,8 @@ export interface AuditLog {
   timestamp: string;
   ipAddress: string;
   userAgent?: string;
-  changes?: Record<string, { old: any; new: any }>;
-  metadata?: Record<string, any>;
+  changes?: Record<string, { old: JsonValue; new: JsonValue }>;
+  metadata?: JsonObject;
 }
 
 export enum ReportType {
@@ -106,4 +106,10 @@ export interface ComplianceReport {
   metrics: Record<string, number>;
   findings?: string[];
   recommendations?: string[];
+}
+
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export interface JsonObject {
+  [key: string]: JsonValue;
 }

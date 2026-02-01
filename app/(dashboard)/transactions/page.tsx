@@ -25,6 +25,9 @@ export default function TransactionMonitoringPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -34,19 +37,11 @@ export default function TransactionMonitoringPage() {
     }
 
     const fetchTransactions = async () => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('vs_token') : null;
-      if (!token) {
-        setError('Not authenticated');
-        setLoading(false);
-        return;
-      }
-
+      setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/admin/transactions?limit=100&offset=0`, {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+        const offset = (page - 1) * limit;
+        const res = await fetch(`${API_BASE}/admin/transactions?limit=${limit}&offset=${offset}`, {
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         });
         
@@ -57,32 +52,12 @@ export default function TransactionMonitoringPage() {
         const data = await res.json();
         const txs = Array.isArray(data.transactions) ? data.transactions : [];
         
-        const ids = new Set<string>();
-        for (const t of txs) {
-          const s = String(t.sender_id || t.senderId || '').trim();
-          const r = String(t.receiver_id || t.receiverId || '').trim();
-          if (s) ids.add(s);
-          if (r) ids.add(r);
+        if (typeof data.total === 'number') {
+          setTotal(data.total);
+        } else if (typeof data.count === 'number') {
+           setTotal(data.count); 
         }
-        const idList = Array.from(ids);
-        const nameMap: Record<string, { name: string; email?: string; type?: string }> = {};
-        const fetchUser = async (id: string) => {
-          const r = await fetch(`${API_BASE}/admin/users/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-            credentials: 'include',
-          });
-          if (r.ok) {
-            const u = await r.json();
-            const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
-            nameMap[id] = {
-              name: fullName || u.email || `User-${String(id).slice(0, 8)}`,
-              email: u.email,
-              type: String(u.user_type || '').toLowerCase(),
-            };
-          }
-        };
-        await Promise.all(idList.map(fetchUser));
-
+        
         const mapped: Transaction[] = txs.map((t: any) => {
           const amt = t.amount && typeof t.amount === 'object' ? t.amount.amount : t.amount;
           const cur = t.amount && typeof t.amount === 'object' ? t.amount.currency : t.currency;
@@ -90,19 +65,32 @@ export default function TransactionMonitoringPage() {
           const netAmtRaw = t.net_amount && typeof t.net_amount === 'object' ? t.net_amount.amount : t.net_amount;
           const senderId = String(t.sender_id || t.senderId || '').trim();
           const receiverId = String(t.receiver_id || t.receiverId || '').trim();
-          const senderInfo = senderId ? nameMap[senderId] : undefined;
-          const receiverInfo = receiverId ? nameMap[receiverId] : undefined;
           const fallbackSender = senderId ? `User-${senderId.slice(0, 8)}` : 'Unknown';
           const fallbackReceiver = receiverId ? `User-${receiverId.slice(0, 8)}` : 'Unknown';
           const txType = String(t.transaction_type || '').toLowerCase();
           const dir: 'sent' | 'received' =
             txType === 'deposit' ? 'received' : 'sent';
+          
+          const senderWalletNumber = t.sender_wallet_number || (senderId ? `VS-${senderId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
+          const receiverWalletNumber = t.receiver_wallet_number || (receiverId ? `VS-${receiverId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
+          
+          const amountNum = parseFloat(amt || 0);
+          const highThreshold = cur === 'MWK' ? 1000000 : 10000;
+          const mediumThreshold = cur === 'MWK' ? 100000 : 1000;
+          const riskLevel: 'Low' | 'Medium' | 'High' =
+            amountNum >= highThreshold ? 'High' :
+            amountNum >= mediumThreshold ? 'Medium' : 'Low';
+          const riskScore = riskLevel === 'High' ? 90 : riskLevel === 'Medium' ? 50 : 10;
           return {
             id: t.id || t.transaction_id || '',
-            customer: t.sender_name || (senderInfo?.name ?? t.sender_email) || fallbackSender,
-            merchant: t.receiver_name || (receiverInfo?.name ?? t.receiver_email) || fallbackReceiver,
-            senderType: (senderInfo?.type ?? String(t.sender_user_type || '')).toLowerCase() || undefined,
-            receiverType: (receiverInfo?.type ?? String(t.receiver_user_type || '')).toLowerCase() || undefined,
+            customer: t.sender_name || t.sender_email || fallbackSender,
+            merchant: t.receiver_name || t.receiver_email || fallbackReceiver,
+            senderType: String(t.sender_user_type || '').toLowerCase() || undefined,
+            receiverType: String(t.receiver_user_type || '').toLowerCase() || undefined,
+            senderWalletNumber,
+            receiverWalletNumber,
+            riskLevel,
+            riskScore,
             rawAmount: parseFloat(amt || 0),
             feeAmount: feeAmtRaw !== undefined ? parseFloat(feeAmtRaw || 0) : undefined,
             netAmount: netAmtRaw !== undefined ? parseFloat(netAmtRaw || 0) : undefined,
@@ -126,7 +114,7 @@ export default function TransactionMonitoringPage() {
     };
 
     fetchTransactions();
-  }, [sessionLoading, isAuthenticated]);
+  }, [sessionLoading, isAuthenticated, page, limit]);
 
   const mapStatus = (status: string): 'Completed' | 'Pending' | 'Failed' => {
     const s = (status || '').toLowerCase();
@@ -139,7 +127,9 @@ export default function TransactionMonitoringPage() {
     return transactions.filter((tx) => {
       const matchesSearch = tx.id.toLowerCase().includes(filters.search.toLowerCase()) ||
         tx.customer.toLowerCase().includes(filters.search.toLowerCase()) ||
-        tx.merchant.toLowerCase().includes(filters.search.toLowerCase());
+        tx.merchant.toLowerCase().includes(filters.search.toLowerCase()) ||
+        (tx.senderWalletNumber?.toLowerCase() || '').includes(filters.search.toLowerCase()) ||
+        (tx.receiverWalletNumber?.toLowerCase() || '').includes(filters.search.toLowerCase());
       const matchesStatus = filters.status === 'all' || tx.status.toLowerCase() === filters.status.toLowerCase();
       const matchesCurrency = filters.currency === 'all' || tx.currency === filters.currency;
       const matchesType =
@@ -181,6 +171,7 @@ export default function TransactionMonitoringPage() {
       search: '',
       status: 'all',
       currency: 'all',
+      type: 'all',
     });
   };
 
@@ -232,6 +223,64 @@ export default function TransactionMonitoringPage() {
         onFlagTransaction={handleFlagTransaction}
         formatAmount={formatAmount}
       />
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+        <div className="flex flex-1 justify-between sm:hidden">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1 || loading}
+            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page * limit >= total || loading}
+            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+          >
+            Next
+          </button>
+        </div>
+        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Showing <span className="font-medium">{Math.min(total, (page - 1) * limit + 1)}</span> to <span className="font-medium">{Math.min(total, page * limit)}</span> of{' '}
+              <span className="font-medium">{total}</span> results
+            </p>
+          </div>
+          <div>
+            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
+              >
+                <span className="sr-only">Previous</span>
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <button
+                disabled
+                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0 dark:text-white dark:ring-gray-600"
+              >
+                {page}
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * limit >= total || loading}
+                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
+              >
+                <span className="sr-only">Next</span>
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
 
       <FlagTransactionDialog
         open={flagOpen}

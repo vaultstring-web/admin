@@ -1,4 +1,6 @@
-module.exports = {
+import animate from "tailwindcss-animate";
+
+const config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",
@@ -6,8 +8,10 @@ module.exports = {
   theme: {
     extend: {},
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 };
+
+export default config;
 
 
 

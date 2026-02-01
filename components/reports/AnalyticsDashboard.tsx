@@ -4,10 +4,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  LineChart, TrendingUp, Globe, Layers, 
-  ArrowUpRight, ShieldCheck, Zap, LayoutGrid,
+  ArrowUpRight, ShieldCheck, Zap,
   FileBarChart, DatabaseZap
 } from 'lucide-react';
+import type { SystemMetrics, EarningsReport } from '@/lib/api';
 import { TransactionVolumeChart } from './TransactionVolumeChart';
 import { UserGrowthByRegion } from './UserGrowthByRegion';
 import { RevenueFromFees } from './RevenueFromFees';
@@ -19,8 +19,8 @@ import { DataExportPanel } from './DataExportPanel';
 import { Badge } from '../ui/badge';
 
 interface AnalyticsDashboardProps {
-  metrics?: any;
-  earnings?: any[];
+  metrics?: SystemMetrics;
+  earnings?: EarningsReport[];
 }
 
 export const AnalyticsDashboard = ({ metrics, earnings }: AnalyticsDashboardProps) => {

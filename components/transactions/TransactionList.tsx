@@ -39,13 +39,31 @@ export function TransactionList(props: TransactionListProps) {
                 className="group hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all duration-200"
               >
                 <td className="px-6 py-4 font-mono text-xs text-slate-400">
-                  #{tx.reference || tx.id}
+                  <div className="flex items-center gap-2">
+                    <span>#{tx.reference || tx.id}</span>
+                    {tx.riskLevel && (
+                      <Badge className={cn(
+                        "h-5 px-2 text-[10px]",
+                        tx.riskLevel === 'High' ? "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400" :
+                        tx.riskLevel === 'Medium' ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" :
+                        "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                      )}>
+                        {tx.riskLevel} Risk
+                      </Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                  {tx.customer}
+                  <div>{tx.customer}</div>
+                  {tx.senderWalletNumber && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Wallet {tx.senderWalletNumber}</div>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                  {tx.merchant}
+                  <div>{tx.merchant}</div>
+                  {tx.receiverWalletNumber && (
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Wallet {tx.receiverWalletNumber}</div>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                   {(() => {

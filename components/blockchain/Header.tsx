@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Activity, Server, Clock, Shield, ChevronRight, Cpu } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Activity, Server, Clock, Shield, Cpu } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -150,7 +149,16 @@ export const BlockchainHeader: React.FC<HeaderProps> = ({
   );
 };
 
-function StatCard({ label, value, subValue, icon: Icon, isMono, customElement }: any) {
+type StatCardProps = {
+  label: string;
+  value: React.ReactNode | string | number;
+  subValue?: string;
+  icon: React.ComponentType<{ size?: number }>;
+  isMono?: boolean;
+  customElement?: React.ReactNode;
+};
+
+function StatCard({ label, value, subValue, icon: Icon, isMono, customElement }: StatCardProps) {
   return (
     <Card className="border-none shadow-sm bg-white dark:bg-slate-900 ring-1 ring-slate-100 dark:ring-slate-800 overflow-hidden group hover:ring-emerald-500/30 transition-all">
       <CardContent className="p-4 relative">

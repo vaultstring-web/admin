@@ -24,12 +24,8 @@ export default function ForexPage() {
       setLoading(true)
       setError(null)
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("vs_token") : null
         const res = await fetch(`${API_BASE}/forex/rates`, {
-          headers: token ? { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          } : { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         })
         if (!res.ok) {

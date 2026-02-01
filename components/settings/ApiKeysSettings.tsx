@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { 
   Copy, Key, Eye, EyeOff, Trash2, RefreshCw, 
   Building, Smartphone, DollarSign, Plus, 
-  ShieldCheck, Zap, MoreHorizontal, Check 
+  ShieldCheck, Zap, MoreHorizontal 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

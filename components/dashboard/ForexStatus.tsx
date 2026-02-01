@@ -2,7 +2,6 @@ import React from 'react';
 import { Card } from './dash-ui/Card';
 import { RefreshCcw, Globe, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
 import type { DashboardData } from './types';
-import { motion } from 'framer-motion';
 
 interface ForexStatusProps {
   data: DashboardData;

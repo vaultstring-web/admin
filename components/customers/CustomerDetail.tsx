@@ -1,9 +1,10 @@
 // app/components/CustomerDetail.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Customer, KYCStatus, AccountStatus, AuditLog } from './types';
-import { ArrowLeft, CheckCircle, XCircle, ShieldAlert, ShieldCheck, MapPin, Mail, Phone, Calendar, Clock, FileText, AlertTriangle, User } from 'lucide-react';
+import { getUserWallets, Wallet } from '@/lib/api';
+import { ArrowLeft, CheckCircle, XCircle, ShieldAlert, ShieldCheck, MapPin, Mail, Phone, Calendar, Clock, FileText, AlertTriangle, User, CreditCard } from 'lucide-react';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Modal } from './Modal';
@@ -13,7 +14,7 @@ interface CustomerDetailProps {
   onBack: () => void;
   onUpdateStatus: (id: string, newStatus: KYCStatus | AccountStatus, reason?: string) => Promise<void>;
   onUpdateRole?: (id: string, role: string, reason?: string) => Promise<void>;
-  onUpdateProfile?: (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string }>) => Promise<void>;
+  onUpdateProfile?: (id: string, updates: Partial<{ first_name: string; last_name: string; email: string; phone: string; country_code: string; password: string }>) => Promise<void>;
   onDelete?: (id: string, reason?: string) => Promise<void>;
 }
 
@@ -33,6 +34,30 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
   const [email, setEmail] = useState(customer.email);
   const [phone, setPhone] = useState(customer.phone);
   const [country, setCountry] = useState(customer.address.country);
+  const [password, setPassword] = useState('');
+
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [walletsLoading, setWalletsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchWallets = async () => {
+      setWalletsLoading(true);
+      try {
+        const response = await getUserWallets(customer.id);
+        if (response.data?.addresses) {
+          setWallets(response.data.addresses);
+        }
+      } catch (err) {
+        console.error('Failed to fetch wallets:', err);
+      } finally {
+        setWalletsLoading(false);
+      }
+    };
+
+    if (activeTab === 'profile') {
+      fetchWallets();
+    }
+  }, [customer.id, activeTab]);
 
   const handleRejectKYC = async () => {
     if (!reason.trim()) {
@@ -255,6 +280,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
         <div className="lg:col-span-2 space-y-6">
           
           {activeTab === 'profile' && (
+            <>
             <div className="bg-white dark:bg-neutral-dark-surface border border-neutral-light-border dark:border-neutral-dark-border rounded-lg p-6 shadow-sm">
               <h3 className="text-lg font-medium text-neutral-light-heading dark:text-neutral-dark-heading mb-4">Detailed Information</h3>
               {editMode ? (
@@ -279,13 +305,31 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
                     <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">Country</label>
                     <input className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" value={country} onChange={(e) => setCountry(e.target.value)} />
                   </div>
+                  <div>
+                    <label className="text-xs text-neutral-light-text dark:text-neutral-dark-text">New Password (Optional)</label>
+                    <input 
+                      type="password"
+                      className="mt-1 w-full border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      placeholder="Leave blank to keep current"
+                    />
+                  </div>
                   <div className="sm:col-span-2">
                     <Button 
                       variant="primary" 
                       onClick={async () => {
                         if (!onUpdateProfile) return;
-                        await onUpdateProfile(customer.id, { first_name: firstName, last_name: lastName, email, phone, country_code: country });
+                        await onUpdateProfile(customer.id, { 
+                          first_name: firstName, 
+                          last_name: lastName, 
+                          email, 
+                          phone, 
+                          country_code: country,
+                          ...(password ? { password } : {})
+                        });
                         setEditMode(false);
+                        setPassword('');
                       }}
                     >
                       Save Changes
@@ -317,6 +361,40 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
                 </dl>
               )}
             </div>
+
+            <div className="bg-white dark:bg-neutral-dark-surface border border-neutral-light-border dark:border-neutral-dark-border rounded-lg p-6 shadow-sm mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CreditCard className="w-5 h-5 text-neutral-light-text dark:text-neutral-dark-text" />
+                <h3 className="text-lg font-medium text-neutral-light-heading dark:text-neutral-dark-heading">Wallets</h3>
+              </div>
+              {walletsLoading ? (
+                <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text py-4 text-center">Loading wallets...</div>
+              ) : wallets.length > 0 ? (
+                <div className="space-y-4">
+                  {wallets.map(w => (
+                    <div key={w.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 border rounded-md border-neutral-light-border dark:border-neutral-dark-border bg-neutral-light-bg dark:bg-neutral-dark-bg gap-2">
+                      <div>
+                        <div className="font-mono text-sm font-medium text-neutral-light-heading dark:text-neutral-dark-heading">{w.wallet_address || 'No Address'}</div>
+                        <div className="text-xs text-neutral-light-text dark:text-neutral-dark-text flex items-center gap-2">
+                          <span className="uppercase font-bold">{w.currency}</span>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${w.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-neutral-100 text-neutral-800'}`}>
+                            {w.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-mono text-neutral-light-text dark:text-neutral-dark-text bg-white dark:bg-neutral-800 px-2 py-1 rounded select-all border border-neutral-light-border dark:border-neutral-dark-border">
+                        ID: {w.id}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text py-4 text-center border-2 border-dashed border-neutral-light-border dark:border-neutral-dark-border rounded-lg">
+                  No wallets found for this user.
+                </div>
+              )}
+            </div>
+          </>
           )}
 
           {activeTab === 'kyc' && (
