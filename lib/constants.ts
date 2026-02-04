@@ -14,6 +14,7 @@ export const ROUTES = {
   BLOCKCHAIN: "/blockchain",
   COMPLIANCE: "/compliance",
   NOTIFICATIONS: "/notifications",
+  SECURITY: "/security",
   SETTINGS: "/settings",
   REPORTS: "/reports",
 } as const
@@ -23,6 +24,13 @@ export const NAV_GROUPS = {
   overview: {
     title: "Overview",
     items: [{ title: "Dashboard", href: ROUTES.DASHBOARD, icon: "LayoutDashboard" }],
+  },
+  securityCenter: {
+    title: "Security Center",
+    items: [
+      { title: "Threat Monitor", href: ROUTES.SECURITY, icon: "ShieldCheck" },
+      { title: "Compliance", href: ROUTES.COMPLIANCE, icon: "FileCheck" },
+    ],
   },
   usersAccounts: {
     title: "Users & Accounts",

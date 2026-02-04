@@ -77,7 +77,7 @@ const generateMerchantName = () => {
 
 // Generate mock transactions
 export const MOCK_TRANSACTIONS: Transaction[] = Array.from({ length: 200 }, (_, i) => {
-  const currencies = ['MWK', 'CNY', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'ZAR'];
+  const currencies = ['MWK', 'CNY', 'ZMW'];
   const statuses = ['Completed', 'Pending', 'Failed'] as const;
   const statusWeights = [0.75, 0.20, 0.05]; // 75% completed, 20% pending, 5% failed
   
@@ -106,12 +106,9 @@ export const MOCK_TRANSACTIONS: Transaction[] = Array.from({ length: 200 }, (_, 
   } else if (currency === 'CNY') {
     minAmount = 1000;
     maxAmount = 1000000;
-  } else if (currency === 'USD' || currency === 'EUR' || currency === 'GBP') {
+  } else if (currency === 'ZMW') {
     minAmount = 100;
-    maxAmount = 100000;
-  } else if (currency === 'JPY') {
-    minAmount = 10000;
-    maxAmount = 10000000;
+    maxAmount = 500000;
   }
   
   const rawAmount = Math.floor(Math.random() * (maxAmount - minAmount + 1)) + minAmount;
@@ -226,14 +223,7 @@ export const getTransactionStats = () => {
 export const CURRENCY_RATES = {
   MWK: 1,
   CNY: 0.012, // 1 CNY = 0.012 MWK (simplified)
-  USD: 0.00059, // 1 USD = 0.00059 MWK (simplified)
-  EUR: 0.00055,
-  GBP: 0.00047,
-  JPY: 0.000088,
-  AUD: 0.00039,
-  CAD: 0.00041,
-  CHF: 0.00054,
-  ZAR: 0.000032,
+  ZMW: 0.015, // 1 ZMW = 0.015 MWK (simplified)
 };
 
 // Helper function to convert amount to base currency (MWK)

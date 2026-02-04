@@ -105,7 +105,7 @@ function StatCard({
 
     return (
       <div className="flex items-baseline gap-0.5">
-        <span className="text-lg font-medium text-slate-400 mr-1">¥</span>
+        <span className="text-lg font-medium text-slate-400 mr-1">MK</span>
         <span className="text-2xl font-bold tracking-tight">{whole}</span>
         <span className="text-lg font-medium text-slate-400">.{decimal}</span>
       </div>

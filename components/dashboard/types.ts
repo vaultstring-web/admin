@@ -1,4 +1,6 @@
 
+import type { TransactionVolume } from '@/lib/api';
+
 export type TimeRange = 'Today' | '7d' | '30d';
 
 export interface KPIValue {
@@ -10,6 +12,7 @@ export interface KPIValue {
 export interface VolumeData {
   mwk: KPIValue;
   cny: KPIValue;
+  zmw: KPIValue;
 }
 
 export interface UserMetrics {
@@ -46,6 +49,8 @@ export interface DashboardData {
   transactions: KPIValue;
   users: UserMetrics;
   volume: VolumeData;
+  volumeHistory?: TransactionVolume[];
+  recentTransactions?: Transaction[];
   earnings: {
     total: number;
     currency: string;

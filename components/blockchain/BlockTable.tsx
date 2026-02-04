@@ -7,17 +7,37 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, ExternalLink, Box, Database, ArrowRight } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { cn } from '@/lib/utils';
 
 interface BlockTableProps {
   blocks: Block[];
+  page?: number;
+  total?: number;
+  limit?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export const BlockTable: React.FC<BlockTableProps> = ({ blocks }) => {
+export const BlockTable: React.FC<BlockTableProps> = ({ 
+  blocks,
+  page = 1,
+  total = 0,
+  limit = 10,
+  onPageChange
+}) => {
   const formatBlockHash = (hash: string) => {
     if (hash.length <= 16) return hash;
     return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
   };
+
+  const totalPages = Math.ceil(total / limit)
 
   return (
     <Card className="border-none shadow-sm bg-white dark:bg-slate-950 ring-1 ring-slate-100 dark:ring-slate-800 overflow-hidden">
@@ -78,7 +98,7 @@ export const BlockTable: React.FC<BlockTableProps> = ({ blocks }) => {
                   </TableCell>
                   <TableCell>
                     <span className="text-xs font-bold text-slate-600 dark:text-slate-400 tabular-nums">
-                      {new Date().toLocaleTimeString([], { hour12: false })}
+                      {new Date(block.timestamp).toLocaleTimeString([], { hour12: false })}
                       <span className="text-[10px] ml-1 opacity-50">UTC</span>
                     </span>
                   </TableCell>
@@ -111,14 +131,53 @@ export const BlockTable: React.FC<BlockTableProps> = ({ blocks }) => {
           </Table>
         </div>
 
-        <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
-          <Button 
-            variant="outline" 
-            className="w-full text-[10px] font-black uppercase tracking-[0.2em] h-10 border-slate-200 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-950 shadow-sm"
-          >
-            Fetch Historical Sequence
-          </Button>
-        </div>
+        {onPageChange && total > 0 ? (
+          <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+             <div className="flex items-center justify-between">
+              <div className="text-xs text-slate-500 font-medium">
+                Showing {Math.min(limit, blocks.length)} of {total} blocks
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) onPageChange(page - 1);
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page < totalPages) onPageChange(page + 1);
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+            <Button 
+              variant="outline" 
+              className="w-full text-[10px] font-black uppercase tracking-[0.2em] h-10 border-slate-200 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-950 shadow-sm"
+            >
+              Fetch Historical Sequence
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

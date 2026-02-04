@@ -23,51 +23,103 @@ import { useSession } from '@/hooks/useSession';
 export default function BankingPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [failedTxs, setFailedTxs] = useState<FailedTx[]>([]);
+  const [failedTxPage, setFailedTxPage] = useState(1);
+  const [failedTxTotal, setFailedTxTotal] = useState(0);
+  const failedTxLimit = 5;
+
   const [integrations, setIntegrations] = useState<BankIntegration[]>([]);
+  
   const [settlements, setSettlements] = useState<SettlementBatch[]>([]);
+  const [settlementPage, setSettlementPage] = useState(1);
+  const [settlementTotal, setSettlementTotal] = useState(0);
+  const settlementLimit = 10;
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchFailedTransactions = async () => {
+    try {
+      const offset = (failedTxPage - 1) * failedTxLimit;
+      const txsRes = await getTransactions(failedTxLimit, offset, { status: 'failed' });
+      
+      if (txsRes.data?.transactions) {
+        const mapped: FailedTx[] = txsRes.data.transactions.map((t) => {
+          const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : typeof t.amount === 'number' ? t.amount : 0;
+          const currency = String(t.currency || 'MWK');
+          const ref = String(t.reference || t.id || '').trim() || 'TX-UNKNOWN';
+          const timestamp = String(t.created_at || new Date().toISOString());
+          const reason = String(t.status_reason || 'Processing error');
+          return {
+            id: String(t.id || ref),
+            ref,
+            amount,
+            currency,
+            type: String(t.transaction_type || 'Payout'),
+            category: reason.includes('timeout')
+              ? 'API Timeout'
+              : reason.includes('kyc')
+              ? 'KYC Verification'
+              : reason.includes('insufficient')
+              ? 'Insufficient Funds'
+              : 'System Error',
+            timestamp,
+            diagnostic: reason,
+          } as FailedTx;
+        });
+        setFailedTxs(mapped);
+        setFailedTxTotal(txsRes.data.total || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch failed transactions", err);
+    }
+  };
+
+  const fetchSettlements = async () => {
+    try {
+      const offset = (settlementPage - 1) * settlementLimit;
+      const settlementsRes = await getSettlements(settlementLimit, offset);
+      
+      if (settlementsRes.data?.settlements) {
+        const mapped: SettlementBatch[] = settlementsRes.data.settlements.map((s: Settlement) => ({
+          id: s.id || s.batch_id || `SETTLE-${Date.now()}`,
+          date: new Date(s.created_at).toISOString().split('T')[0],
+          corridor: s.currency === 'MWK' ? Corridor.MALAWI : s.currency === 'ZMW' ? Corridor.ZAMBIA : Corridor.CHINA,
+          volume: typeof s.amount === 'number' ? s.amount : parseFloat(String(s.amount || 0)),
+          currency: s.currency,
+          status: s.status === 'completed' ? 'Completed' : s.status === 'pending' ? 'Pending' : 'Failed',
+          transactionsCount: s.transaction_count || 0,
+          processedAt: s.completed_at || s.created_at,
+        }));
+        setSettlements(mapped);
+        setSettlementTotal(settlementsRes.data.total || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch settlements", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFailedTransactions();
+  }, [failedTxPage]);
+
+  useEffect(() => {
+    fetchSettlements();
+  }, [settlementPage]);
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
       return;
     }
 
-    const fetchAllData = async () => {
+    const fetchStaticData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch failed transactions
-        const txsRes = await getTransactions(100, 0, { status: 'failed' });
-        if (txsRes.data?.transactions) {
-          const mapped: FailedTx[] = txsRes.data.transactions
-            .slice(0, 10)
-            .map((t) => {
-              const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : typeof t.amount === 'number' ? t.amount : 0;
-              const currency = String(t.currency || 'USD');
-              const ref = String(t.reference || t.id || '').trim() || 'TX-UNKNOWN';
-              const timestamp = String(t.created_at || new Date().toISOString());
-              const reason = String(t.status_reason || 'Processing error');
-              return {
-                id: String(t.id || ref),
-                ref,
-                amount,
-                currency,
-                type: String(t.transaction_type || 'Payout'),
-                category: reason.includes('timeout')
-                  ? 'API Timeout'
-                  : reason.includes('kyc')
-                  ? 'KYC Verification'
-                  : reason.includes('insufficient')
-                  ? 'Insufficient Funds'
-                  : 'System Error',
-                timestamp,
-                diagnostic: reason,
-              } as FailedTx;
-            });
-          setFailedTxs(mapped);
-        }
+        await Promise.all([
+          fetchFailedTransactions(),
+          fetchSettlements()
+        ]);
 
         // Fetch bank accounts and gateways to build integrations
         const [accountsRes, gatewaysRes] = await Promise.all([
@@ -83,7 +135,7 @@ export default function BankingPage() {
               id: acc.id,
               name: acc.bank_name,
               provider: 'Bank',
-              corridor: acc.currency === 'MWK' ? Corridor.MALAWI : Corridor.CHINA,
+              corridor: acc.currency === 'MWK' ? Corridor.MALAWI : acc.currency === 'ZMW' ? Corridor.ZAMBIA : Corridor.CHINA,
               status: acc.status === 'active' ? HealthStatus.HEALTHY : HealthStatus.OFFLINE,
               lastSync: acc.connected_at ? new Date(acc.connected_at).toLocaleString() : 'Never',
               availability: acc.status === 'active' ? 99.9 : 0,
@@ -100,7 +152,7 @@ export default function BankingPage() {
               id: gw.id,
               name: gw.name,
               provider: gw.provider || 'Gateway',
-              corridor: gw.name.includes('MW') || gw.name.includes('Malawi') ? Corridor.MALAWI : Corridor.CHINA,
+              corridor: gw.name.includes('MW') || gw.name.includes('Malawi') ? Corridor.MALAWI : gw.name.includes('ZM') || gw.name.includes('Zambia') ? Corridor.ZAMBIA : Corridor.CHINA,
               status: gw.status === 'active' ? HealthStatus.HEALTHY : HealthStatus.OFFLINE,
               lastSync: gw.last_sync ? new Date(gw.last_sync).toLocaleString() : 'Never',
               availability: gw.status === 'active' ? 99.5 : 0,
@@ -113,21 +165,6 @@ export default function BankingPage() {
 
         setIntegrations(integrationsList);
 
-        // Fetch settlements
-        const settlementsRes = await getSettlements(50, 0);
-        if (settlementsRes.data?.settlements) {
-          const mapped: SettlementBatch[] = settlementsRes.data.settlements.map((s: Settlement) => ({
-            id: s.id || s.batch_id || `SETTLE-${Date.now()}`,
-            date: new Date(s.created_at).toISOString().split('T')[0],
-            corridor: s.currency === 'MWK' ? Corridor.MALAWI : Corridor.CHINA,
-            volume: typeof s.amount === 'number' ? s.amount : parseFloat(String(s.amount || 0)),
-            currency: s.currency,
-            status: s.status === 'completed' ? 'Completed' : s.status === 'pending' ? 'Pending' : 'Failed',
-            transactionsCount: s.transaction_count || 0,
-            processedAt: s.completed_at || s.created_at,
-          }));
-          setSettlements(mapped);
-        }
       } catch (err: any) {
         console.error('Failed to fetch banking data:', err);
         setError(err?.message || 'Failed to load banking data');
@@ -136,7 +173,7 @@ export default function BankingPage() {
       }
     };
 
-    fetchAllData();
+    fetchStaticData();
   }, [sessionLoading, isAuthenticated]);
 
   if (sessionLoading || loading) {
@@ -184,18 +221,30 @@ export default function BankingPage() {
         activeIntegrations={activeIntegrations}
         settlementHealth={settlementHealth}
         reconHealth={99.2}
-        failedCount={failedTxs.length}
+        failedCount={failedTxTotal || failedTxs.length}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <IntegrationsSection integrations={integrations.length > 0 ? integrations : []} />
-          <SettlementActivity batches={settlements.length > 0 ? settlements : []} />
+          <SettlementActivity 
+            batches={settlements.length > 0 ? settlements : []}
+            page={settlementPage}
+            total={settlementTotal}
+            limit={settlementLimit}
+            onPageChange={setSettlementPage}
+          />
         </div>
         
         <div className="space-y-6">
           <ReconciliationOverview />
-          <FailedTransactions transactions={failedTxs} />
+          <FailedTransactions 
+            transactions={failedTxs}
+            page={failedTxPage}
+            total={failedTxTotal}
+            limit={failedTxLimit}
+            onPageChange={setFailedTxPage}
+          />
         </div>
       </div>
     </div>

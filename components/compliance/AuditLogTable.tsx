@@ -9,6 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Search, History, FileText, ShieldCheck, Download, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface AuditLogTableProps {
   logs: AuditLog[];
@@ -18,6 +26,8 @@ interface AuditLogTableProps {
 export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const getActionBadge = (action: AuditAction) => {
     // Using semantic brand colors instead of generic Tailwind colors
@@ -48,6 +58,10 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
 
     return matchesSearch && (!startDate || logDate >= startDate) && (!endDate || logDate <= endDate);
   });
+
+  const total = filteredLogs.length;
+  const totalPages = Math.ceil(total / limit);
+  const paginatedLogs = filteredLogs.slice((page - 1) * limit, page * limit);
 
   return (
     <Card className="border-border/60 shadow-none bg-card">
@@ -130,7 +144,7 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLogs.slice(0, 10).map((log) => (
+              {paginatedLogs.map((log) => (
                 <TableRow key={log.id} className="group hover:bg-muted/10 transition-colors border-border/40">
                   <TableCell className="py-3">
                     <div className="font-semibold text-sm">
@@ -182,11 +196,42 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
           </div>
         )}
 
-        {filteredLogs.length > 10 && (
-          <div className="p-md border-t border-border/40 flex justify-center bg-muted/5">
-            <Button variant="ghost" size="sm" className="text-xs font-bold text-secondary hover:bg-secondary/10">
-              Fetch Older Records
-            </Button>
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border/40 bg-muted/5">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    className={page === totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-xs text-muted-foreground mt-2">
+              Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+            </div>
           </div>
         )}
       </CardContent>

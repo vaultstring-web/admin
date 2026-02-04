@@ -189,7 +189,7 @@ export default function ForexPage() {
               <SelectContent>
                 <SelectItem value="MWK">MWK</SelectItem>
                 <SelectItem value="CNY">CNY</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="ZMW">ZMW</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -201,7 +201,7 @@ export default function ForexPage() {
               <SelectContent>
                 <SelectItem value="MWK">MWK</SelectItem>
                 <SelectItem value="CNY">CNY</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="ZMW">ZMW</SelectItem>
               </SelectContent>
             </Select>
           </div>

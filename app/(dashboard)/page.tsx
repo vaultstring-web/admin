@@ -5,9 +5,10 @@ import { KpiSummary } from "@/components/dashboard/KpiSummary";
 import { SystemHealth } from "@/components/dashboard/SystemHealth";
 import { ForexStatus } from "@/components/dashboard/ForexStatus";
 import { AlertsSection } from "@/components/dashboard/AlertsSection";
+import { TransactionVolumeChart } from "@/components/reports/TransactionVolumeChart";
 import { useSession } from "@/hooks/useSession";
-import { getUsers, getTransactions as getAdminTransactions, getForexRates } from "@/lib/api";
-import type { DashboardData } from "@/components/dashboard/types";
+import { getUsers, getForexRates, getSystemStats, getTransactionVolume, getRiskAlerts } from "@/lib/api";
+import type { DashboardData, Alert } from "@/components/dashboard/types";
 
 export default function DashboardPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -25,108 +26,133 @@ export default function DashboardPage() {
       setError(null);
 
       try {
-        // Fetch users, transactions, and forex rates in parallel using centralized API
-        const [usersResponse, transactionsResponse, forexResponse] = await Promise.all([
-          getUsers(100, 0),
-          getAdminTransactions(100, 0),
+        // Fetch real data from backend endpoints
+        const [
+          usersResponse, 
+          statsResponse, 
+          volumeResponse, 
+          alertsResponse,
+          forexResponse
+        ] = await Promise.all([
+          getUsers(1000, 0), // Fetch more users to get accurate counts
+          getSystemStats(),
+          getTransactionVolume(6), // Get last 6 months for chart and trend calculation
+          getRiskAlerts(10, 0),
           getForexRates(),
         ]);
 
+        // Process Users Data
+        const usersData = usersResponse.data?.users || [];
+        const customers = usersData.filter((u) => u.user_type === "individual").length;
+        const merchants = usersData.filter((u) => u.user_type === "merchant").length;
+
+        // Process System Stats
+        const stats = statsResponse.data || {
+          total_transactions: 0,
+          completed: 0,
+          pending: 0,
+          pending_approvals: 0,
+          flagged: 0,
+          total_volume: 0,
+          total_fees: 0
+        };
+
+        // Process Volume Data (Trends)
+        const volumes = volumeResponse.data || [];
+        // Sort by date/period if needed, assuming backend returns sorted
+        // backend returns: ORDER BY DATE_TRUNC('month', created_at) ASC
+        // So last item is current month, second to last is previous month
+        const currentMonth = volumes[volumes.length - 1] || { mwk: 0, cny: 0, zmw: 0, total: 0 };
+        const prevMonth = volumes[volumes.length - 2] || { mwk: 0, cny: 0, zmw: 0, total: 0 };
+
+        const calculateTrend = (curr: number, prev: number) => {
+          if (prev === 0) return curr > 0 ? 100 : 0;
+          return ((curr - prev) / prev) * 100;
+        };
+
+        const mwkVolume = Number(currentMonth.mwk);
+        const mwkPrev = Number(prevMonth.mwk);
+        const cnyVolume = Number(currentMonth.cny);
+        const cnyPrev = Number(prevMonth.cny);
+        const zmwVolume = Number(currentMonth.zmw);
+        const zmwPrev = Number(prevMonth.zmw);
+
+        // Process Alerts
+        const riskAlerts = alertsResponse.data?.alerts || [];
+        const dashboardAlerts: Alert[] = riskAlerts.map(alert => ({
+          id: alert.id,
+          severity: 'Warning', // Map from alert.severity if available, else default
+          category: 'Transaction',
+          message: `Flagged Transaction: ${alert.reference} - ${alert.flag_reason || 'Suspicious activity'}`,
+          timestamp: alert.created_at,
+          isRead: false
+        }));
         
-        // Handle errors gracefully
-        const usersData = usersResponse.error 
-          ? { users: [], total: 0 } 
-          : usersResponse.data || { users: [], total: 0 };
-        
-        const txData = transactionsResponse.error
-          ? { transactions: [], total: 0 }
-          : transactionsResponse.data || { transactions: [], total: 0 };
-        
-        const forexData = forexResponse.error
-          ? { rates: [] }
-          : forexResponse.data || { rates: [] };
+        // Add generic system alert if needed
+        if (stats.pending_approvals > 5) {
+          dashboardAlerts.push({
+            id: 'sys-pending',
+            severity: 'Info',
+            category: 'System',
+            message: `${stats.pending_approvals} transactions pending approval`,
+            timestamp: new Date().toISOString(),
+            isRead: false
+          });
+        }
 
-        // Calculate stats
-        const allUsers = Array.isArray(usersData.users) ? usersData.users : [];
-        const allTxs = Array.isArray(txData.transactions) ? txData.transactions : [];
-
-        const customers = allUsers.filter((u) => u.user_type === "individual").length;
-        const merchants = allUsers.filter((u) => u.user_type === "merchant").length;
-
-        const mwkTxs = allTxs.filter((t) => t.currency === "MWK");
-        const cnyTxs = allTxs.filter((t) => t.currency === "CNY");
-
-        const mwkVolume = mwkTxs.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-        const cnyVolume = cnyTxs.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-
-        // Find MWK/CNY rate - handle different response formats
-        const mwkRate = forexData.rates?.find((r: any) => 
+        // Process Forex
+        const forexData = forexResponse.data?.rates || [];
+        const mwkRate = forexData.find((r: any) => 
           (r.pair === "MWK/CNY") || 
           (r.from_currency === "MWK" && r.to_currency === "CNY") ||
           (r.from_currency === "CNY" && r.to_currency === "MWK")
         )?.rate || 0.0085;
 
-        // Calculate Total Earnings (Fees)
-        let totalEarningsMWK = 0;
-        allTxs.forEach((t: any) => {
-          // Check for fee object or fallback fields
-          const feeAmount = parseFloat(t.fee?.amount || t.fee_amount || 0);
-          const feeCurrency = t.fee?.currency || t.fee_currency || 'MWK';
-          
-          if (feeAmount > 0) {
-            if (feeCurrency === 'MWK') {
-              totalEarningsMWK += feeAmount;
-            } else if (feeCurrency === 'CNY') {
-              // Convert CNY to MWK (assuming rate is MWK->CNY)
-              // 1 MWK = rate CNY => 1 CNY = 1/rate MWK
-              totalEarningsMWK += feeAmount / mwkRate;
-            } else {
-              // Fallback: assume 1:1 or just add it (USD etc might be much higher value, but let's stick to MWK/CNY focus)
-              totalEarningsMWK += feeAmount;
-            }
-          }
-        });
-
-        const dashboardData = {
+        const dashboardData: DashboardData = {
           transactions: {
-            current: allTxs.length,
-            previous: Math.floor(allTxs.length * 0.95),
-            trend: 5.2,
+            current: stats.total_transactions,
+            previous: Math.floor(stats.total_transactions * 0.9), // Mock previous for total txs as we don't have monthly count history in stats yet
+            trend: 10, 
           },
           users: {
             customers: {
               current: customers,
-              previous: Math.max(0, customers - 3),
-              trend: customers > 0 ? ((customers - Math.max(0, customers - 3)) / Math.max(0, customers - 3)) * 100 : 0,
+              previous: Math.floor(customers * 0.95),
+              trend: 5,
             },
             merchants: {
               current: merchants,
-              previous: Math.max(0, merchants - 1),
-              trend: merchants > 0 ? ((merchants - Math.max(0, merchants - 1)) / Math.max(0, merchants - 1)) * 100 : 0,
+              previous: Math.floor(merchants * 0.98),
+              trend: 2,
             },
           },
           volume: {
             mwk: {
               current: mwkVolume,
-              previous: Math.floor(mwkVolume * 0.92),
-              trend: 8.1,
+              previous: mwkPrev,
+              trend: calculateTrend(mwkVolume, mwkPrev),
             },
             cny: {
               current: cnyVolume,
-              previous: Math.floor(cnyVolume * 0.88),
-              trend: 12.3,
+              previous: cnyPrev,
+              trend: calculateTrend(cnyVolume, cnyPrev),
+            },
+            zmw: {
+              current: zmwVolume,
+              previous: zmwPrev,
+              trend: calculateTrend(zmwVolume, zmwPrev),
             },
           },
           earnings: {
-            total: totalEarningsMWK,
+            total: Number(stats.total_fees),
             currency: "MWK",
-            trend: 15.4, // Mock positive trend
+            trend: 8.5, // Mock trend for earnings
           },
           health: {
             uptime24h: 99.9,
             uptime30d: 99.7,
             avgLatencyMs: 145,
-            errorRate: 0.02,
+            errorRate: (stats.flagged / (stats.total_transactions || 1)) * 100, // Real error/risk rate
             processingLatencyMs: 120,
           },
           forex: {
@@ -136,7 +162,7 @@ export default function DashboardPage() {
             lastUpdated: new Date().toISOString(),
             trend: "neutral",
           },
-          alerts: [],
+          alerts: dashboardAlerts,
           lastRefresh: new Date().toISOString(),
         };
 
@@ -209,7 +235,12 @@ export default function DashboardPage() {
       </div>
 
       <KpiSummary data={data} />
-      <SystemHealth data={data} />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TransactionVolumeChart data={data.volumeHistory} />
+        <SystemHealth data={data} />
+      </div>
+
       <ForexStatus data={data} />
       <AlertsSection alerts={data?.alerts || []} />
     </div>

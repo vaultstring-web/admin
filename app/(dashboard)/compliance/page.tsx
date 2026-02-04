@@ -12,6 +12,7 @@ import { FlaggedTransactions } from '@/components/compliance/FlaggedTransactions
 import { AuditLogTable } from '@/components/compliance/AuditLogTable';
 import { ComplianceReports } from '@/components/compliance/ComplianceReports';
 import type { FlaggedTransaction as ComplianceTx } from '@/components/compliance/types';
+import { KYCStatus } from '@/components/compliance/types';
 import {
   getKYCApplications,
   getAuditLogs,
@@ -26,11 +27,13 @@ import { useSession } from '@/hooks/useSession';
 export default function CompliancePage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [activeTab, setActiveTab] = useState('kyc');
+  const [showHistory, setShowHistory] = useState(false);
   const [flagged, setFlagged] = useState<ComplianceTx[]>([]);
   const [kycApplications, setKycApplications] = useState<KYCApplication[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [complianceReports, setComplianceReports] = useState<ComplianceReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [kycLoading, setKycLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleReviewKYC(id: string): void {
@@ -48,17 +51,40 @@ export default function CompliancePage() {
       return;
     }
 
-    const fetchAllData = async () => {
+    const fetchKYCData = async () => {
+      setKycLoading(true);
+      try {
+        // If showHistory is false, fetch 'pending'. If true, fetch all (or processed).
+        // Let's assume history means everything or non-pending.
+        // For now, let's fetch 'pending' for queue, and 'verified' + 'rejected' for history if possible,
+        // or just all for history.
+        // Based on typical queue logic: Queue = Pending. History = All others.
+        // My backend supports single status. If I want multiple for history, I might need to make two calls or update backend.
+        // Let's just use empty status (All) for history for now, which includes pending, but user can filter client side if needed.
+        // Or better: fetch 'pending' for queue. Fetch empty (all) for history.
+        const status = showHistory ? '' : 'pending';
+        const kycRes = await getKYCApplications(status, 50, 0);
+        if (kycRes.data?.applications) {
+          setKycApplications(kycRes.data.applications);
+        }
+      } catch (err) {
+        console.error("Failed to fetch KYC applications", err);
+      } finally {
+        setKycLoading(false);
+      }
+    };
+
+    fetchKYCData();
+  }, [showHistory, sessionLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (sessionLoading || !isAuthenticated) return;
+
+    const fetchOtherData = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch KYC applications
-        const kycRes = await getKYCApplications(undefined, 50, 0);
-        if (kycRes.data?.applications) {
-          setKycApplications(kycRes.data.applications);
-        }
-
         // Fetch audit logs
         const auditRes = await getAuditLogs(100, 0);
         if (auditRes.data?.logs) {
@@ -87,8 +113,8 @@ export default function CompliancePage() {
                   : 0;
               const currency =
                 t.amount && typeof t.amount === 'object'
-                  ? String(t.amount.currency || 'USD')
-                  : String(t.currency || 'USD');
+                  ? String(t.amount.currency || 'MWK')
+                  : String(t.currency || 'MWK');
               const id = String(t.id || t.reference || '').trim() || `TX-${Date.now()}`;
               const transactionId = String(t.reference || id);
               const customerId = String(t.sender_id || '');
@@ -220,6 +246,9 @@ export default function CompliancePage() {
               applications={kycApplications}
               onReview={handleReviewKYC}
               onAssign={(id, userId) => console.log('Assign:', id, userId)}
+              showHistory={showHistory}
+              onToggleHistory={setShowHistory}
+              isLoading={kycLoading}
             />
           </TabsContent>
           <TabsContent value="fraud" className="animate-in fade-in slide-in-from-bottom-2 duration-300">

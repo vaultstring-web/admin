@@ -2,13 +2,33 @@
 
 import React from 'react';
 import { AlertCircle, RefreshCw, Search, ChevronRight } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { FailedTransaction } from './types';
 
 interface FailedTransactionsProps {
   transactions: FailedTransaction[];
+  page?: number;
+  total?: number;
+  limit?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export const FailedTransactions: React.FC<FailedTransactionsProps> = ({ transactions }) => {
+export const FailedTransactions: React.FC<FailedTransactionsProps> = ({ 
+  transactions,
+  page = 1,
+  total = 0,
+  limit = 5,
+  onPageChange
+}) => {
+  const totalPages = Math.ceil(total / limit)
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm transition-colors">
       <div className="p-6 border-b border-border flex justify-between items-center">
@@ -17,7 +37,7 @@ export const FailedTransactions: React.FC<FailedTransactionsProps> = ({ transact
           <p className="text-sm text-muted-foreground mt-1">Actions required for recovery</p>
         </div>
         <div className="w-6 h-6 rounded-full bg-destructive/10 flex items-center justify-center">
-          <span className="text-xs font-bold text-destructive">{transactions.length}</span>
+          <span className="text-xs font-bold text-destructive">{total || transactions.length}</span>
         </div>
       </div>
 
@@ -64,10 +84,46 @@ export const FailedTransactions: React.FC<FailedTransactionsProps> = ({ transact
           </div>
         ))}
 
-        <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium py-2 mt-2">
-          View all failed attempts
-          <ChevronRight size={16} />
-        </button>
+        {onPageChange && total > 0 && (
+            <div className="flex items-center justify-center pt-2">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) onPageChange(page - 1);
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page < totalPages) onPageChange(page + 1);
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+
+        {!onPageChange && (
+          <button className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium py-2 mt-2">
+            View all failed attempts
+            <ChevronRight size={16} />
+          </button>
+        )}
       </div>
     </div>
   );

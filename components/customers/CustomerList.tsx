@@ -6,6 +6,14 @@ import { Customer, KYCStatus, AccountStatus } from './types';
 import { Search, Filter, ChevronDown, ChevronUp, User as UserIcon, ArrowUpDown } from 'lucide-react';
 import { Badge } from './Badge';
 import { Button } from './Button';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 const SortIcon = ({ field, sortField, sortDir }: { field: string; sortField: string; sortDir: 'asc' | 'desc' }) => {
   if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-20" />;
@@ -16,9 +24,21 @@ interface CustomerListProps {
   customers: Customer[];
   onSelectCustomer: (id: string) => void;
   loading?: boolean;
+  page?: number;
+  total?: number;
+  limit?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export const CustomerList = ({ customers, onSelectCustomer, loading = false }: CustomerListProps) => {
+export const CustomerList = ({ 
+  customers, 
+  onSelectCustomer, 
+  loading = false,
+  page = 1,
+  total = 0,
+  limit = 50,
+  onPageChange
+}: CustomerListProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [kycFilter, setKycFilter] = useState<KYCStatus | 'ALL'>('ALL');
   const [accountFilter, setAccountFilter] = useState<AccountStatus | 'ALL'>('ALL');
@@ -284,14 +304,53 @@ export const CustomerList = ({ customers, onSelectCustomer, loading = false }: C
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 border-t border-neutral-light-border dark:border-neutral-dark-border flex items-center justify-between">
-          <span className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-            Showing <span className="font-semibold">{filteredCustomers.length}</span> {filteredCustomers.length === 1 ? 'result' : 'results'}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled>Previous</Button>
-            <Button variant="outline" size="sm" disabled>Next</Button>
-          </div>
+        <div className="px-6 py-4 border-t border-neutral-light-border dark:border-neutral-dark-border">
+          {onPageChange ? (
+            <div className="flex flex-col gap-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) onPageChange(page - 1);
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page * limit < total) onPageChange(page + 1);
+                      }}
+                      className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+              <div className="text-center text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                Showing {total === 0 ? 0 : Math.min(total, (page - 1) * limit + 1)}–{Math.min(total, page * limit)} of {total} results
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                Showing <span className="font-semibold">{filteredCustomers.length}</span> {filteredCustomers.length === 1 ? 'result' : 'results'}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled>Previous</Button>
+                <Button variant="outline" size="sm" disabled>Next</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

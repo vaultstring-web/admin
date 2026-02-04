@@ -11,8 +11,7 @@ export enum HealthStatus {
 export enum Corridor {
   MALAWI = 'MALAWI',
   CHINA = 'CHINA',
-  EUROPE = 'EUROPE',
-  USA = 'USA',
+  ZAMBIA = 'ZAMBIA',
 }
 
 export interface BankIntegration {

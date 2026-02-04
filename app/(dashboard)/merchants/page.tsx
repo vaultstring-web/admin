@@ -11,9 +11,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { API_BASE } from "@/lib/constants";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export default function MerchantsPage() {
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [simpleMerchants, setSimpleMerchants] = useState<Array<{
     id: string;
     businessName: string;
@@ -69,7 +80,8 @@ export default function MerchantsPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${API_BASE}/admin/users?limit=100&offset=0`, {
+        const offset = (page - 1) * limit;
+        const res = await fetch(`${API_BASE}/admin/users?limit=${limit}&offset=${offset}&type=merchant`, {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
         });
@@ -79,8 +91,9 @@ export default function MerchantsPage() {
         }
         const data = await res.json();
         const users = Array.isArray(data.users) ? data.users : [];
-        const merchants = users.filter((u: any) => (u.user_type || "").toLowerCase() === "merchant");
-        const mapped = merchants.map((u: any) => ({
+        setTotal(data.total || 0);
+        // Backend now filters by type=merchant, so we use all returned users
+        const mapped = users.map((u: any) => ({
           id: u.id,
           businessName: u.business_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Merchant",
           registrationDate: (u.created_at || "").toString().slice(0, 10),
@@ -95,31 +108,19 @@ export default function MerchantsPage() {
         }));
         setSimpleMerchants(mapped);
       } catch (e: any) {
+        console.error('Failed to fetch merchants:', e);
         setError(e.message || "Failed to load merchants");
-        const fallback = MOCK_MERCHANTS.map(m => ({
-          id: m.id,
-          businessName: m.businessName,
-          registrationDate: m.registrationDate.split("T")[0],
-          verificationStatus: m.verificationStatus,
-          accountStatus: m.accountStatus,
-          category: m.category,
-          contact: m.contact,
-          email: m.email,
-          phone: m.phone,
-          riskScore: m.riskScore,
-          primaryCurrency: 'MWK',
-        }));
-        setSimpleMerchants(fallback);
+        setSimpleMerchants([]);
       } finally {
         setLoading(false);
       }
     };
     fetchMerchants();
-  }, []);
+  }, [page, limit]);
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalMerchants = simpleMerchants.length;
+    const totalMerchants = total;
     const pendingVerification = simpleMerchants.filter(m => m.verificationStatus === "pending").length;
     const suspendedAccounts = simpleMerchants.filter(m => m.accountStatus === "suspended").length;
     const totalVolume = 0;
@@ -292,6 +293,10 @@ export default function MerchantsPage() {
             <MerchantsList 
               onSelectMerchant={handleSelectMerchant}
               merchants={loading ? [] : simpleMerchants}
+              page={page}
+              total={total}
+              limit={limit}
+              onPageChange={setPage}
             />
           )}
         </TabsContent>

@@ -238,7 +238,7 @@ export const MOCK_FAILED_TRANSACTIONS: FailedTransaction[] = [
     id: 'TX-982',
     ref: 'C2B-X892J',
     amount: 4500.00,
-    currency: 'USD',
+    currency: 'ZMW',
     type: 'Payout',
     category: 'Compliance',
     timestamp: '2024-05-20 14:22:01',
@@ -268,7 +268,7 @@ export const MOCK_FAILED_TRANSACTIONS: FailedTransaction[] = [
     id: 'TX-985',
     ref: 'B2C-Z112L',
     amount: 2300.00,
-    currency: 'USD',
+    currency: 'MWK',
     type: 'Refund',
     category: 'Customer Dispute',
     timestamp: '2024-05-20 11:45:22',
@@ -288,7 +288,7 @@ export const MOCK_FAILED_TRANSACTIONS: FailedTransaction[] = [
     id: 'TX-987',
     ref: 'C2B-X894P',
     amount: 6200.00,
-    currency: 'USD',
+    currency: 'ZMW',
     type: 'Payout',
     category: 'KYC Verification',
     timestamp: '2024-05-20 09:30:18',
@@ -347,13 +347,13 @@ export const getFailedTransactionsByCategory = (category: string): FailedTransac
 
 // Additional utility data
 export const WEEKLY_VOLUME_DATA = [
-  { name: 'Mon', volume: 4500000, currency: 'USD' },
-  { name: 'Tue', volume: 3800000, currency: 'USD' },
-  { name: 'Wed', volume: 5100000, currency: 'USD' },
-  { name: 'Thu', volume: 4200000, currency: 'USD' },
-  { name: 'Fri', volume: 5800000, currency: 'USD' },
-  { name: 'Sat', volume: 2100000, currency: 'USD' },
-  { name: 'Sun', volume: 1500000, currency: 'USD' },
+  { name: 'Mon', volume: 4500000, currency: 'MWK' },
+  { name: 'Tue', volume: 3800000, currency: 'MWK' },
+  { name: 'Wed', volume: 5100000, currency: 'MWK' },
+  { name: 'Thu', volume: 4200000, currency: 'MWK' },
+  { name: 'Fri', volume: 5800000, currency: 'MWK' },
+  { name: 'Sat', volume: 2100000, currency: 'MWK' },
+  { name: 'Sun', volume: 1500000, currency: 'MWK' },
 ];
 
 export const RECONCILIATION_DATA = {
@@ -364,7 +364,7 @@ export const RECONCILIATION_DATA = {
 };
 
 export const RECENT_DISCREPANCIES = [
-  { id: 'REC-0012', description: 'MTN MW mismatch: $450.00', type: 'Warning' },
+  { id: 'REC-0012', description: 'MTN MW mismatch: MWK 450,000.00', type: 'Warning' },
   { id: 'REC-0015', description: 'ICBC duplicate entry check', type: 'Info' },
   { id: 'REC-0018', description: 'Airtel Money reconciliation pending', type: 'Warning' },
   { id: 'REC-0021', description: 'WeChat Pay batch verification required', type: 'Info' },

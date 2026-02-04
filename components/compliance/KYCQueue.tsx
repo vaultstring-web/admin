@@ -7,21 +7,40 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Clock, FileStack, ArrowRight, UserCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState } from 'react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface KYCQueueProps {
   applications: KYCApplication[];
   onReview: (id: string) => void;
   onAssign: (id: string, userId: string) => void;
+  showHistory: boolean;
+  onToggleHistory: (show: boolean) => void;
+  isLoading?: boolean;
 }
 
-export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAssign }) => {
+export const KYCQueue: React.FC<KYCQueueProps> = ({ 
+  applications, 
+  onReview, 
+  onAssign, 
+  showHistory, 
+  onToggleHistory,
+  isLoading = false
+}) => {
   // Mapping statuses to our new semantic brand variables
   const getStatusBadge = (status: KYCStatus) => {
     const styles: Record<KYCStatus, string> = {
       [KYCStatus.PENDING]: "bg-semantic-warning-light/10 text-semantic-warning-light border-semantic-warning-light/20",
-      [KYCStatus.APPROVED]: "bg-primary/10 text-primary border-primary/20", // Brand Green
+      [KYCStatus.VERIFIED]: "bg-primary/10 text-primary border-primary/20", // Brand Green
       [KYCStatus.REJECTED]: "bg-semantic-error-light/10 text-semantic-error-light border-semantic-error-light/20",
-      [KYCStatus.UNDER_REVIEW]: "bg-secondary/10 text-secondary border-secondary/20", // Brand Blue
+      [KYCStatus.PROCESSING]: "bg-secondary/10 text-secondary border-secondary/20", // Brand Blue
     };
     return (
       <Badge variant="outline" className={`font-medium ${styles[status]}`}>
@@ -44,7 +63,18 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAs
     );
   };
 
-  const pendingApplications = applications.filter(app => app.status === KYCStatus.PENDING);
+  const [page, setPage] = useState(1);
+  // const [showHistory, setShowHistory] = useState(false); // Lifted state up
+  const limit = 5;
+
+  // When backend filtering is used, 'applications' is already filtered.
+  // However, we might want to ensure we don't show non-pending items if showHistory is false,
+  // just in case the parent passed mixed data. But if we trust the parent/backend:
+  const filteredApplications = applications;
+
+  const total = filteredApplications.length;
+  const totalPages = Math.ceil(total / limit);
+  const paginatedApplications = filteredApplications.slice((page - 1) * limit, page * limit);
 
   return (
     <Card className="border-border/50 shadow-sm overflow-hidden">
@@ -57,12 +87,20 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAs
             <CardTitle className="text-xl font-semibold tracking-tight">KYC Verification</CardTitle>
           </div>
           <CardDescription className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-semantic-warning-light animate-pulse" />
-            {pendingApplications.length} priority reviews outstanding
+            <span className={`inline-block w-2 h-2 rounded-full ${showHistory ? 'bg-gray-400' : 'bg-semantic-warning-light animate-pulse'}`} />
+            {isLoading ? 'Loading...' : `${filteredApplications.length} ${showHistory ? 'total records' : 'priority reviews outstanding'}`}
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="font-medium hover:bg-secondary hover:text-white transition-colors">
-          History
+        <Button 
+          variant={showHistory ? "secondary" : "outline"} 
+          size="sm" 
+          className="font-medium hover:bg-secondary hover:text-white transition-colors"
+          onClick={() => {
+            onToggleHistory(!showHistory);
+            setPage(1);
+          }}
+        >
+          {showHistory ? "View Queue" : "History"}
         </Button>
       </CardHeader>
 
@@ -79,7 +117,7 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAs
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pendingApplications.slice(0, 5).map((app) => (
+            {paginatedApplications.map((app) => (
               <TableRow key={app.id} className="group transition-colors hover:bg-muted/10">
                 <TableCell className="py-4 px-md">
                   <div className="flex items-center gap-3">
@@ -137,7 +175,7 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAs
           </TableBody>
         </Table>
 
-        {pendingApplications.length === 0 && (
+        {filteredApplications.length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <ShieldCheck className="h-8 w-8 text-primary" />
@@ -146,6 +184,52 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({ applications, onReview, onAs
             <p className="text-muted-foreground max-w-62.5 mx-auto text-sm">
               All compliance checks are up to date.
             </p>
+          </div>
+        )}
+
+        {isLoading && (
+           <div className="flex flex-col items-center justify-center py-20 text-center">
+             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+             <p className="mt-4 text-sm text-muted-foreground">Loading applications...</p>
+           </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border/40 bg-muted/5">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    className={page === totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-xs text-muted-foreground mt-2">
+              Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+            </div>
           </div>
         )}
       </CardContent>

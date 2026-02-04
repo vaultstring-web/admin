@@ -7,8 +7,16 @@ import { TransactionFilters } from '@/components/transactions/TransactionFilters
 import { FlagTransactionDialog } from '@/components/transactions/FlagTransactionDialog';
 import { TransactionStats } from '@/components/transactions/TransactionStats';
 import { type Transaction } from '@/components/transactions/types';
-import { API_BASE } from '@/lib/constants';
+import { getTransactions, type Transaction as ApiTransaction } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 export default function TransactionMonitoringPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -38,65 +46,70 @@ export default function TransactionMonitoringPage() {
 
     const fetchTransactions = async () => {
       setLoading(true);
+      setError(null);
       try {
         const offset = (page - 1) * limit;
-        const res = await fetch(`${API_BASE}/admin/transactions?limit=${limit}&offset=${offset}`, {
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+        const response = await getTransactions(limit, offset, {
+          status: filters.status !== 'all' ? filters.status : undefined,
+          currency: filters.currency !== 'all' ? filters.currency : undefined,
         });
-        
-        if (!res.ok) {
-          throw new Error('Failed to fetch transactions');
+
+        if (response.error) {
+          throw new Error(response.error);
         }
 
-        const data = await res.json();
-        const txs = Array.isArray(data.transactions) ? data.transactions : [];
+        const data = response.data;
+        const txs = data?.transactions || [];
         
-        if (typeof data.total === 'number') {
+        if (data?.total !== undefined) {
           setTotal(data.total);
-        } else if (typeof data.count === 'number') {
-           setTotal(data.count); 
+        } else if (data?.count !== undefined) {
+          setTotal(data.count); 
         }
         
-        const mapped: Transaction[] = txs.map((t: any) => {
-          const amt = t.amount && typeof t.amount === 'object' ? t.amount.amount : t.amount;
-          const cur = t.amount && typeof t.amount === 'object' ? t.amount.currency : t.currency;
-          const feeAmtRaw = t.fee && typeof t.fee === 'object' ? t.fee.amount : t.fee;
-          const netAmtRaw = t.net_amount && typeof t.net_amount === 'object' ? t.net_amount.amount : t.net_amount;
-          const senderId = String(t.sender_id || t.senderId || '').trim();
-          const receiverId = String(t.receiver_id || t.receiverId || '').trim();
+        const mapped: Transaction[] = txs.map((t: ApiTransaction) => {
+          // Normalize API transaction to UI Transaction
+          const amt = typeof t.amount === 'object' ? (t.amount as any).amount : t.amount;
+          const cur = typeof t.amount === 'object' ? (t.amount as any).currency : t.currency;
+          const feeAmtRaw = t.fee && typeof t.fee === 'object' ? (t.fee as any).amount : t.fee;
+          const netAmtRaw = t.net_amount && typeof t.net_amount === 'object' ? (t.net_amount as any).amount : t.net_amount;
+          
+          const senderId = String(t.sender_id || '').trim();
+          const receiverId = String(t.receiver_id || '').trim();
           const fallbackSender = senderId ? `User-${senderId.slice(0, 8)}` : 'Unknown';
           const fallbackReceiver = receiverId ? `User-${receiverId.slice(0, 8)}` : 'Unknown';
+          
           const txType = String(t.transaction_type || '').toLowerCase();
           const dir: 'sent' | 'received' =
             txType === 'deposit' ? 'received' : 'sent';
           
-          const senderWalletNumber = t.sender_wallet_number || (senderId ? `VS-${senderId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
-          const receiverWalletNumber = t.receiver_wallet_number || (receiverId ? `VS-${receiverId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
+          const senderWalletNumber = (t as any).sender_wallet_number || (senderId ? `VS-${senderId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
+          const receiverWalletNumber = (t as any).receiver_wallet_number || (receiverId ? `VS-${receiverId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
           
-          const amountNum = parseFloat(amt || 0);
+          const amountNum = parseFloat(String(amt || 0));
           const highThreshold = cur === 'MWK' ? 1000000 : 10000;
           const mediumThreshold = cur === 'MWK' ? 100000 : 1000;
           const riskLevel: 'Low' | 'Medium' | 'High' =
             amountNum >= highThreshold ? 'High' :
             amountNum >= mediumThreshold ? 'Medium' : 'Low';
           const riskScore = riskLevel === 'High' ? 90 : riskLevel === 'Medium' ? 50 : 10;
+          
           return {
             id: t.id || t.transaction_id || '',
             customer: t.sender_name || t.sender_email || fallbackSender,
             merchant: t.receiver_name || t.receiver_email || fallbackReceiver,
-            senderType: String(t.sender_user_type || '').toLowerCase() || undefined,
-            receiverType: String(t.receiver_user_type || '').toLowerCase() || undefined,
+            senderType: String((t as any).sender_user_type || '').toLowerCase() || undefined,
+            receiverType: String((t as any).receiver_user_type || '').toLowerCase() || undefined,
             senderWalletNumber,
             receiverWalletNumber,
             riskLevel,
             riskScore,
-            rawAmount: parseFloat(amt || 0),
-            feeAmount: feeAmtRaw !== undefined ? parseFloat(feeAmtRaw || 0) : undefined,
-            netAmount: netAmtRaw !== undefined ? parseFloat(netAmtRaw || 0) : undefined,
+            rawAmount: amountNum,
+            feeAmount: feeAmtRaw !== undefined ? parseFloat(String(feeAmtRaw || 0)) : undefined,
+            netAmount: netAmtRaw !== undefined ? parseFloat(String(netAmtRaw || 0)) : undefined,
             currency: cur || 'MWK',
             status: mapStatus(t.status),
-            date: new Date(t.created_at || t.timestamp || Date.now()),
+            date: new Date(t.created_at || (t as any).timestamp || Date.now()),
             flagged: t.flagged || false,
             transactionType: txType,
             direction: dir,
@@ -108,13 +121,14 @@ export default function TransactionMonitoringPage() {
       } catch (err: any) {
         console.error('Failed to fetch transactions:', err);
         setError(err?.message || 'Failed to load transactions');
+        setTransactions([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTransactions();
-  }, [sessionLoading, isAuthenticated, page, limit]);
+  }, [sessionLoading, isAuthenticated, page, limit, filters]);
 
   const mapStatus = (status: string): 'Completed' | 'Pending' | 'Failed' => {
     const s = (status || '').toLowerCase();
@@ -225,60 +239,40 @@ export default function TransactionMonitoringPage() {
       />
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
-        <div className="flex flex-1 justify-between sm:hidden">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage(p => p + 1)}
-            disabled={page * limit >= total || loading}
-            className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
-          >
-            Next
-          </button>
-        </div>
-        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              Showing <span className="font-medium">{Math.min(total, (page - 1) * limit + 1)}</span> to <span className="font-medium">{Math.min(total, page * limit)}</span> of{' '}
-              <span className="font-medium">{total}</span> results
-            </p>
-          </div>
-          <div>
-            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1 || loading}
-                className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
-              >
-                <span className="sr-only">Previous</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <button
-                disabled
-                className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0 dark:text-white dark:ring-gray-600"
-              >
+      <div className="mt-4">
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (page > 1) setPage(p => p - 1);
+                }}
+                className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
+            
+            <PaginationItem>
+              <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
                 {page}
-              </button>
-              <button
-                onClick={() => setPage(p => p + 1)}
-                disabled={page * limit >= total || loading}
-                className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 dark:ring-gray-600 dark:hover:bg-gray-700"
-              >
-                <span className="sr-only">Next</span>
-                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </nav>
-          </div>
+              </PaginationLink>
+            </PaginationItem>
+            
+            <PaginationItem>
+              <PaginationNext 
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (page * limit < total) setPage(p => p + 1);
+                }}
+                className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+        <div className="text-center text-sm text-muted-foreground mt-2">
+          Showing {Math.min(total, (page - 1) * limit + 1)} to {Math.min(total, page * limit)} of {total} results
         </div>
       </div>
 

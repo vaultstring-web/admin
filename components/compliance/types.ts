@@ -1,8 +1,8 @@
 export enum KYCStatus {
   PENDING = 'pending',
-  APPROVED = 'approved',
+  VERIFIED = 'verified',
   REJECTED = 'rejected',
-  UNDER_REVIEW = 'under_review'
+  PROCESSING = 'processing'
 }
 
 export enum RiskLevel {

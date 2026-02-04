@@ -7,7 +7,7 @@ import {
   ArrowUpRight, ShieldCheck, Zap,
   FileBarChart, DatabaseZap
 } from 'lucide-react';
-import type { SystemMetrics, EarningsReport } from '@/lib/api';
+import type { SystemMetrics, EarningsReport, TransactionVolume } from '@/lib/api';
 import { TransactionVolumeChart } from './TransactionVolumeChart';
 import { UserGrowthByRegion } from './UserGrowthByRegion';
 import { RevenueFromFees } from './RevenueFromFees';
@@ -21,9 +21,10 @@ import { Badge } from '../ui/badge';
 interface AnalyticsDashboardProps {
   metrics?: SystemMetrics;
   earnings?: EarningsReport[];
+  volumeData?: TransactionVolume[];
 }
 
-export const AnalyticsDashboard = ({ metrics, earnings }: AnalyticsDashboardProps) => {
+export const AnalyticsDashboard = ({ metrics, earnings, volumeData }: AnalyticsDashboardProps) => {
   return (
     <div className="space-y-8">
       {/* Note: We removed the Page Header here as it's now handled 
@@ -64,9 +65,9 @@ export const AnalyticsDashboard = ({ metrics, earnings }: AnalyticsDashboardProp
             
             {/* Primary High-Volume Chart - Larger Span */}
             <div className="lg:col-span-4">
-              <TransactionVolumeChart />
+              <TransactionVolumeChart data={volumeData} />
             </div>
-
+            
             {/* Side Metric - Revenue */}
             <div className="lg:col-span-2">
               <RevenueFromFees earnings={earnings} />

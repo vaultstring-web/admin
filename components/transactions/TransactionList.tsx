@@ -6,6 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { type Transaction } from './types';
 import { cn } from '@/lib/utils'; // Assuming you have a cn utility
+import { useState } from 'react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -16,6 +25,13 @@ interface TransactionListProps {
 
 export function TransactionList(props: TransactionListProps) {
   const { transactions, onFlagTransaction, formatAmount } = props;
+  const [page, setPage] = useState(1);
+  const limit = 10;
+  const total = transactions.length;
+  const totalPages = Math.ceil(total / limit);
+  
+  const paginatedTransactions = transactions.slice((page - 1) * limit, page * limit);
+
   return (
     <Card className="overflow-hidden border-none shadow-sm bg-white dark:bg-slate-950">
       <div className="overflow-x-auto">
@@ -33,7 +49,7 @@ export function TransactionList(props: TransactionListProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {transactions.map((tx) => (
+            {paginatedTransactions.map((tx) => (
               <tr 
                 key={tx.id} 
                 className="group hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all duration-200"
@@ -115,6 +131,42 @@ export function TransactionList(props: TransactionListProps) {
           </tbody>
         </table>
       </div>
+      {totalPages > 1 && (
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="text-sm text-slate-500 dark:text-slate-400">
+              Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} results
+            </div>
+            <Pagination className="justify-end w-auto">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (page > 1) setPage(page - 1);
+                    }}
+                    className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (page < totalPages) setPage(page + 1);
+                    }}
+                    className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+        </div>
+      )}
     </Card>
   );
 }

@@ -23,11 +23,23 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { SimplifiedMerchant } from "./constants";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 // Define props interface
 interface MerchantListProps {
   merchants?: SimplifiedMerchant[];
   onSelectMerchant?: (id: string) => void;
+  page?: number;
+  total?: number;
+  limit?: number;
+  onPageChange?: (page: number) => void;
 }
 
 // Default generate function (used if no merchants are provided)
@@ -56,15 +68,32 @@ function makeMock(n = 24): SimplifiedMerchant[] {
 
 export default function MerchantList({ 
   merchants, 
-  onSelectMerchant 
+  onSelectMerchant,
+  page: controlledPage,
+  total: controlledTotal,
+  limit: controlledLimit,
+  onPageChange
 }: MerchantListProps = {}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [verificationFilter, setVerificationFilter] = useState<string>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [page, setPage] = useState(1);
-  const perPage = 10;
+  
+  const isServerSide = onPageChange !== undefined;
+  const [internalPage, setInternalPage] = useState(1);
+  
+  const page = isServerSide ? (controlledPage || 1) : internalPage;
+  const setPage = (p: number | ((prev: number) => number)) => {
+    if (isServerSide && onPageChange) {
+      const newPage = typeof p === 'function' ? p(page) : p;
+      onPageChange(newPage);
+    } else {
+      setInternalPage(p);
+    }
+  };
+  
+  const perPage = controlledLimit || 10;
 
   // Use provided merchants or generate mock data
   const data = useMemo(() => merchants || makeMock(56), [merchants]);
@@ -91,9 +120,9 @@ export default function MerchantList({
     });
   }, [data, query, verificationFilter, accountFilter, categoryFilter]);
 
-  const total = filtered.length;
+  const total = isServerSide ? (controlledTotal || 0) : filtered.length;
   const pages = Math.max(1, Math.ceil(total / perPage));
-  const visible = filtered.slice((page - 1) * perPage, page * perPage);
+  const visible = isServerSide ? filtered : filtered.slice((page - 1) * perPage, page * perPage);
 
   // Handle view action
   const handleViewMerchant = (id: string) => {
@@ -300,28 +329,40 @@ export default function MerchantList({
             </TableCaption>
           </Table>
 
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing {(page - 1) * perPage + 1}–
-              {Math.min(page * perPage, total)} of {total}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                disabled={page === pages}
-              >
-                Next
-              </Button>
+          <div className="mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(pages, p + 1));
+                    }}
+                    className={page === pages ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-sm text-muted-foreground mt-2">
+              Showing {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} of {total}
             </div>
           </div>
         </div>

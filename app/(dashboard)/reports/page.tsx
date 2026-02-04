@@ -10,8 +10,10 @@ import {
   getSystemMetrics,
   getEarningsReport,
   getAuditLogs,
+  getTransactionVolume,
   type SystemMetrics,
   type EarningsReport,
+  type TransactionVolume,
 } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
 
@@ -21,6 +23,7 @@ export default function ReportsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [earnings, setEarnings] = useState<EarningsReport[]>([]);
+  const [volumeData, setVolumeData] = useState<TransactionVolume[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,9 +36,10 @@ export default function ReportsPage() {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const [metricsRes, earningsRes] = await Promise.all([
+      const [metricsRes, earningsRes, volumeRes] = await Promise.all([
         getSystemMetrics(),
         getEarningsReport(startDate, endDate),
+        getTransactionVolume(6), // Get last 6 months
       ]);
 
       if (metricsRes.data) {
@@ -44,6 +48,10 @@ export default function ReportsPage() {
 
       if (earningsRes.data?.reports) {
         setEarnings(earningsRes.data.reports);
+      }
+
+      if (volumeRes.data) {
+        setVolumeData(volumeRes.data);
       }
     } catch (err: any) {
       console.error('Failed to fetch reports data:', err);

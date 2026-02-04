@@ -30,7 +30,7 @@ function checkAuthAndRedirect() {
 }
 
 // Base fetch function with auth
-async function apiFetch<T>(
+export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
@@ -97,6 +97,38 @@ async function apiFetch<T>(
   }
 }
 
+// Duplicate definitions removed
+
+export interface SecurityEvent {
+  id: string;
+  type: string;
+  severity: string;
+  description: string;
+  source_ip: string;
+  user_id?: string;
+  created_at: string;
+  reference?: string;
+  flag_reason?: string;
+}
+
+// Duplicate getRiskAlerts removed
+
+export interface ExchangeRate {
+  id: string;
+  base_currency: string;
+  target_currency: string;
+  rate: string;
+  buy_rate: string;
+  sell_rate: string;
+  spread: string;
+  provider: string;
+  valid_from: string;
+  valid_to?: string;
+  created_at: string;
+}
+
+// Duplicate getForexRates removed
+
 // ============================================================================
 // USER MANAGEMENT API
 // ============================================================================
@@ -124,8 +156,21 @@ export interface UsersResponse {
   offset?: number;
 }
 
-export async function getUsers(limit = 50, offset = 0): Promise<ApiResponse<UsersResponse>> {
-  return apiFetch<UsersResponse>(`/admin/users?limit=${limit}&offset=${offset}`);
+export interface UsersFilters {
+  kycStatus?: string;
+  userType?: string;
+}
+
+export async function getUsers(limit = 50, offset = 0, filters?: UsersFilters): Promise<ApiResponse<UsersResponse>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+
+  if (filters?.kycStatus) params.append('kyc_status', filters.kycStatus);
+  if (filters?.userType) params.append('user_type', filters.userType);
+
+  return apiFetch<UsersResponse>(`/admin/users?${params.toString()}`);
 }
 
 export async function getUserById(id: string): Promise<ApiResponse<User>> {
@@ -201,6 +246,93 @@ export async function updateUserProfile(
     body: JSON.stringify(updates),
   });
 }
+
+// ============================================================================
+// ANALYTICS & STATS API
+// ============================================================================
+
+export interface SystemStats {
+  total_transactions: number;
+  completed: number;
+  pending: number;
+  pending_approvals: number;
+  flagged: number;
+  total_volume: number; // Decimal string or number
+  total_fees: number;   // Decimal string or number
+  active_users: number;
+}
+
+export async function getSystemStats(): Promise<ApiResponse<SystemStats>> {
+  return apiFetch<SystemStats>('/admin/analytics/metrics');
+}
+
+export interface TransactionVolume {
+  period: string;
+  cny: number;
+  mwk: number;
+  zmw: number;
+  total: number;
+}
+
+export async function getTransactionVolume(months = 6): Promise<ApiResponse<TransactionVolume[]>> {
+  return apiFetch<TransactionVolume[]>(`/admin/analytics/volume?months=${months}`);
+}
+
+export interface RiskAlert {
+  id: string;
+  reference: string;
+  amount: string;
+  currency: string;
+  reason: string;
+  risk_score: number;
+  created_at: string;
+  flag_reason?: string;
+}
+
+export async function getRiskAlerts(limit = 50, offset = 0): Promise<ApiResponse<{ alerts: RiskAlert[]; limit: number; offset: number }>> {
+  // Fetch flagged transactions as risk alerts
+  const response = await apiFetch<TransactionsResponse>(`/admin/transactions?status=flagged&limit=${limit}&offset=${offset}`);
+  
+  if (response.error || !response.data) {
+    return { 
+      error: response.error,
+      data: { alerts: [], limit, offset } 
+    };
+  }
+
+  const alerts: RiskAlert[] = response.data.transactions.map(tx => ({
+    id: tx.id,
+    reference: tx.reference || 'N/A',
+    amount: tx.amount.toString(),
+    currency: tx.currency,
+    reason: tx.status_reason || 'Flagged transaction',
+    risk_score: 0, // Not currently available in transaction list
+    created_at: tx.created_at,
+    flag_reason: tx.status_reason
+  }));
+
+  return {
+    data: {
+      alerts,
+      limit: response.data.limit || limit,
+      offset: response.data.offset || offset
+    }
+  };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  user_id?: string;
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  ip_address?: string;
+  created_at: string;
+}
+
+// getAuditLogs is defined in the ANALYTICS & REPORTS API section
+
+
 
 // ============================================================================
 // TRANSACTION MANAGEMENT API
@@ -436,17 +568,35 @@ export async function getAuditLogs(
   if (filters?.startDate) params.append('start_date', filters.startDate);
   if (filters?.endDate) params.append('end_date', filters.endDate);
 
-  return apiFetch<{ logs: AuditLog[]; total?: number }>(`/admin/audit/logs?${params.toString()}`);
+  return apiFetch<{ logs: AuditLog[]; total?: number }>(`/admin/audit-logs?${params.toString()}`);
 }
 
 export async function getSystemMetrics(): Promise<ApiResponse<SystemMetrics>> {
-  return apiFetch<SystemMetrics>('/admin/analytics/metrics');
+  // Map /admin/stats to SystemMetrics
+  const response = await apiFetch<SystemStats>('/admin/stats');
+  if (response.error || !response.data) {
+    return { error: response.error };
+  }
+  
+  const stats = response.data;
+  return {
+    data: {
+      total_users: stats.active_users || 0, // Using active users as proxy for now
+      active_users: stats.active_users || 0,
+      total_transactions: stats.total_transactions,
+      total_volume: Number(stats.total_volume),
+      total_earnings: Number(stats.total_fees),
+      failed_transactions: stats.flagged, // Using flagged as failed/problematic
+      pending_transactions: stats.pending + stats.pending_approvals,
+      last_updated: new Date().toISOString(),
+    }
+  };
 }
 
 export async function getEarningsReport(
   startDate: string,
   endDate: string,
-  currency = 'USD'
+  currency = 'MWK'
 ): Promise<ApiResponse<{ reports: EarningsReport[] }>> {
   return apiFetch<{ reports: EarningsReport[] }>(
     `/admin/analytics/earnings?start_date=${startDate}&end_date=${endDate}&currency=${currency}`
@@ -484,6 +634,8 @@ export interface KYCApplication {
   reviewed_at?: string;
   reviewer_id?: string;
   documents?: any[];
+  name?: string;
+  email?: string;
 }
 
 export interface ComplianceReport {

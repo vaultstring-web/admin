@@ -16,7 +16,8 @@ import {
   BarChart3,
   HelpCircle,
   ChevronRight,
-  CircleDot
+  CircleDot,
+  FileCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NAV_GROUPS } from "@/lib/constants"
@@ -35,6 +36,7 @@ const iconMap = {
   ShieldCheck,
   BarChart3,
   HelpCircle,
+  FileCheck,
 }
 
 export function Sidebar() {

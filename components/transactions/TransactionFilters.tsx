@@ -59,6 +59,7 @@ export function TransactionFilters({
             <SelectItem value="all">All Currencies</SelectItem>
             <SelectItem value="MWK">MWK</SelectItem>
             <SelectItem value="CNY">CNY</SelectItem>
+            <SelectItem value="ZMW">ZMW</SelectItem>
           </SelectContent>
         </Select>
         <Select value={type} onValueChange={(v) => onTypeChange && onTypeChange(v)}>

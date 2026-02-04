@@ -10,16 +10,37 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 
 interface SettlementActivityProps {
   batches: SettlementBatch[];
+  page?: number;
+  total?: number;
+  limit?: number;
+  onPageChange?: (page: number) => void;
 }
 
-export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches }) => {
-  const [currency, setCurrency] = useState<'MWK' | 'CNY'>('MWK');
+export const SettlementActivity: React.FC<SettlementActivityProps> = ({ 
+  batches,
+  page = 1,
+  total = 0,
+  limit = 10,
+  onPageChange
+}) => {
+  const [currency, setCurrency] = useState<'MWK' | 'CNY' | 'ZMW'>('MWK');
 
-  // Simple conversion mock (e.g., 1 CNY = 240 MWK)
-  const conversionRate = currency === 'MWK' ? 1 : 1 / 240;
+  const totalPages = Math.ceil(total / limit)
+  // ... rest of the component
+  
+  // Simple conversion mock
+  const conversionRate = currency === 'MWK' ? 1 : currency === 'ZMW' ? 1/65 : 1 / 240;
 
   const chartData = useMemo(() => [
     { name: 'Mon', vol: 4500000 * conversionRate },
@@ -44,12 +65,10 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches 
     switch (corridor) {
       case Corridor.MALAWI:
         return "bg-emerald-500 text-white dark:bg-emerald-600 border-transparent shadow-sm shadow-emerald-200";
-      case Corridor.USA:
-        return "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300 border-cyan-200/50";
+      case Corridor.ZAMBIA:
+        return "bg-amber-500 text-white dark:bg-amber-600 border-transparent shadow-sm shadow-amber-200";
       case Corridor.CHINA:
         return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 border-rose-200/50";
-      case Corridor.EUROPE:
-        return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 border-indigo-200/50";
       default:
         return "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200";
     }
@@ -71,6 +90,7 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches 
             <TabsList className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 h-8 p-1">
               <TabsTrigger value="MWK" className="text-[10px] font-bold px-3 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all h-6">MWK</TabsTrigger>
               <TabsTrigger value="CNY" className="text-[10px] font-bold px-3 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all h-6">CNY (元)</TabsTrigger>
+              <TabsTrigger value="ZMW" className="text-[10px] font-bold px-3 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all h-6">ZMW (K)</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button variant="outline" size="sm" className="h-8 gap-2 text-xs font-semibold border-slate-200 dark:border-slate-800">
@@ -108,7 +128,7 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches 
                   axisLine={false} 
                   tickLine={false} 
                   tick={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }}
-                  tickFormatter={(v) => currency === 'MWK' ? `${(v/1000000).toFixed(1)}M` : `¥${(v/1000).toFixed(0)}k`}
+                  tickFormatter={(v) => currency === 'MWK' ? `${(v/1000000).toFixed(1)}M` : currency === 'ZMW' ? `K${(v/1000).toFixed(0)}k` : `¥${(v/1000).toFixed(0)}k`}
                 />
                 <Tooltip 
                   cursor={{ fill: 'rgba(16, 185, 129, 0.05)', radius: 6 }}
@@ -118,7 +138,7 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches 
                         <div className="bg-slate-950 text-white p-3 rounded-lg shadow-2xl border border-emerald-500/30 text-xs">
                           <p className="font-bold mb-1 text-slate-400">{payload[0].payload.name}</p>
                           <p className="text-emerald-400 font-mono font-bold text-sm">
-                            {currency === 'CNY' ? '¥' : 'K'}{payload[0].value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            {currency === 'CNY' ? '¥' : currency === 'ZMW' ? 'K' : 'K'}{payload[0].value?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                           </p>
                         </div>
                       );
@@ -201,6 +221,43 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({ batches 
               </TableBody>
             </Table>
           </div>
+
+          {onPageChange && total > 0 && (
+            <div className="flex items-center justify-between px-2">
+              <div className="text-xs text-slate-500 font-medium">
+                Showing {Math.min(limit, batches.length)} of {total} batches
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) onPageChange(page - 1);
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationLink href="#" isActive onClick={(e) => e.preventDefault()}>
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page < totalPages) onPageChange(page + 1);
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

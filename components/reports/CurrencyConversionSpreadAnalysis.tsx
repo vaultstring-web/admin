@@ -15,9 +15,9 @@ export const CurrencySpreadAnalysis = () => {
   ];
 
   const currencyPairs = [
-    { pair: 'USD/CNY', spread: 0.92, profit: 14200, trend: 'up' },
+    { pair: 'ZMW/CNY', spread: 0.92, profit: 14200, trend: 'up' },
     { pair: 'CNY/MWK', spread: 1.32, profit: 18500, trend: 'up' },
-    { pair: 'EUR/CNY', spread: 0.88, profit: 9200, trend: 'down' },
+    { pair: 'ZMW/MWK', spread: 0.88, profit: 9200, trend: 'down' },
     { pair: 'GBP/MWK', spread: 1.45, profit: 12400, trend: 'up' },
   ];
 

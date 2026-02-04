@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { BlockchainHeader, NetworkStatus } from '@/components/blockchain/Header';
 import { BlockTable } from '@/components/blockchain/BlockTable';
+import { WalletTable } from '@/components/blockchain/WalletTable';
 import { SearchSection } from '@/components/blockchain/SearchSection';
 import { VerificationSection } from '@/components/blockchain/VerificationSection';
 import {
@@ -23,9 +24,53 @@ export default function BlockchainPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [networks, setNetworks] = useState<BlockchainNetwork[]>([]);
   const [transactions, setTransactions] = useState<BlockchainTransaction[]>([]);
+  const [txPage, setTxPage] = useState(1);
+  const [txTotal, setTxTotal] = useState(0);
+  const txLimit = 10;
+
   const [wallets, setWallets] = useState<WalletAddress[]>([]);
+  const [walletPage, setWalletPage] = useState(1);
+  const [walletTotal, setWalletTotal] = useState(0);
+  const walletLimit = 10;
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchTransactions = async () => {
+    try {
+      const offset = (txPage - 1) * txLimit;
+      const txsRes = await getBlockchainTransactions(txLimit, offset);
+      
+      if (txsRes.data?.transactions) {
+        setTransactions(txsRes.data.transactions);
+        setTxTotal(txsRes.data.total || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch blockchain transactions", err);
+    }
+  };
+
+  const fetchWallets = async () => {
+    try {
+      const offset = (walletPage - 1) * walletLimit;
+      const walletsRes = await getWalletAddresses(walletLimit, offset);
+      
+      if (walletsRes.data?.addresses) {
+        setWallets(walletsRes.data.addresses);
+        setWalletTotal(walletsRes.data.total || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch wallets", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [txPage]);
+
+  useEffect(() => {
+    fetchWallets();
+  }, [walletPage]);
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
@@ -37,23 +82,15 @@ export default function BlockchainPage() {
       setError(null);
 
       try {
-        const [networksRes, txsRes, walletsRes] = await Promise.all([
-          getBlockchainNetworks(),
-          getBlockchainTransactions(50, 0),
-          getWalletAddresses(50, 0),
+        await Promise.all([
+          fetchTransactions(),
+          fetchWallets(),
+          getBlockchainNetworks().then(res => {
+            if (res.data?.networks) {
+              setNetworks(res.data.networks);
+            }
+          })
         ]);
-
-        if (networksRes.data?.networks) {
-          setNetworks(networksRes.data.networks);
-        }
-
-        if (txsRes.data?.transactions) {
-          setTransactions(txsRes.data.transactions);
-        }
-
-        if (walletsRes.data?.addresses) {
-          setWallets(walletsRes.data.addresses);
-        }
       } catch (err: any) {
         console.error('Failed to fetch blockchain data:', err);
         setError(err?.message || 'Failed to load blockchain data');
@@ -200,22 +237,37 @@ export default function BlockchainPage() {
       <BlockchainHeader
         status={networkStatus}
         height={currentHeight}
+        peerCount={networks[0]?.peer_count || 4}
         lastUpdate={getLastUpdateTime()}
-        peerCount={networks[0]?.peer_count || 0}
-        channel={networks[0]?.channel || 'fintech-ledger-v1'}
       />
-
-      <div className="space-y-6">
-        <SearchSection 
-          onSearch={handleSearch}
-          result={searchResult}
-          error={searchError}
-          isLoading={isSearching}
-        />
+      
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2 space-y-8">
+          <SearchSection 
+            onSearch={handleSearch} 
+            isSearching={isSearching}
+            error={searchError}
+            result={searchResult}
+          />
+          <BlockTable 
+            transactions={transactions} 
+            page={txPage}
+            total={txTotal}
+            limit={txLimit}
+            onPageChange={setTxPage}
+          />
+          <WalletTable 
+            wallets={wallets}
+            page={walletPage}
+            total={walletTotal}
+            limit={walletLimit}
+            onPageChange={setWalletPage}
+          />
+        </div>
         
-        <BlockTable blocks={blocks.length > 0 ? blocks : []} />
-        
-        <VerificationSection />
+        <div className="space-y-8">
+          <VerificationSection />
+        </div>
       </div>
     </div>
   );
