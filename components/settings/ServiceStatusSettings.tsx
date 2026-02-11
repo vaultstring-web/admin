@@ -1,50 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   AlertTriangle, CheckCircle, XCircle, 
   CreditCard, Mail, Bell, Activity, RefreshCw, 
-  Clock, ShieldAlert 
+  Clock, ShieldAlert, Database, Server, Banknote
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { getSystemStatus, type ServiceStatus } from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
 
 export const ServiceStatusSettings = () => {
-  const [services] = useState([
-    {
-      id: '1',
-      name: 'Payment Processing',
-      description: 'Customer deposits and withdrawals',
-      icon: <CreditCard className="h-4 w-4" />,
-      status: 'operational',
-      enabled: true,
-      lastUpdated: '14:30 UTC',
-      uptime: 99.8
-    },
-    {
-      id: '2',
-      name: 'Email Service',
-      description: 'Transaction notifications',
-      icon: <Mail className="h-4 w-4" />,
-      status: 'operational',
-      enabled: true,
-      lastUpdated: '12:15 UTC',
-      uptime: 99.5
-    },
-    {
-      id: '3',
-      name: 'SMS Gateway',
-      description: 'OTP & security alerts',
-      icon: <Bell className="h-4 w-4" />,
-      status: 'degraded',
-      enabled: true,
-      lastUpdated: '10:45 UTC',
-      uptime: 95.2
+  const [services, setServices] = useState<ServiceStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchStatus();
+  }, []);
+
+  const fetchStatus = async () => {
+    setLoading(true);
+    const response = await getSystemStatus();
+    if (response.data) {
+      setServices(response.data.services);
+    } else {
+      toast({
+        title: "Error",
+        description: response.error || "Failed to fetch system status",
+        variant: "destructive",
+      });
     }
-  ]);
+    setLoading(false);
+  };
 
   const getStatusStyles = (status: string) => {
     switch (status) {
@@ -55,6 +47,20 @@ export const ServiceStatusSettings = () => {
       default: return 'text-muted-foreground bg-muted/20 border-border';
     }
   };
+
+  const getIcon = (id: string) => {
+    if (id.includes('db') || id.includes('database')) return <Database className="h-4 w-4" />;
+    if (id.includes('redis') || id.includes('cache')) return <Server className="h-4 w-4" />;
+    if (id.includes('api') || id.includes('core')) return <Activity className="h-4 w-4" />;
+    if (id.includes('forex')) return <Banknote className="h-4 w-4" />;
+    return <Activity className="h-4 w-4" />;
+  };
+
+  // Calculate counts
+  const operationalCount = services.filter(s => s.status === 'operational').length;
+  const degradedCount = services.filter(s => s.status === 'degraded').length;
+  const maintenanceCount = services.filter(s => s.status === 'maintenance').length;
+  const outageCount = services.filter(s => s.status === 'outage').length;
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
@@ -69,8 +75,14 @@ export const ServiceStatusSettings = () => {
           <h2 className="text-xl font-bold tracking-tight">Infrastructure Monitor</h2>
           <p className="text-sm text-muted-foreground">Real-time status of core fintech services.</p>
         </div>
-        <Button variant="outline" size="sm" className="rounded-xl gap-2 h-10 border-border/60">
-          <RefreshCw className="h-3.5 w-3.5" />
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="rounded-xl gap-2 h-10 border-border/60"
+          onClick={fetchStatus}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           Force Health Check
         </Button>
       </div>
@@ -78,10 +90,10 @@ export const ServiceStatusSettings = () => {
       {/* High-Level Pulse Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Operational', count: 2, color: 'text-green-500', icon: CheckCircle },
-          { label: 'Degraded', count: 1, color: 'text-amber-500', icon: AlertTriangle },
-          { label: 'Maintenance', count: 0, color: 'text-blue-500', icon: Clock },
-          { label: 'Total Outage', count: 0, color: 'text-red-500', icon: XCircle },
+          { label: 'Operational', count: operationalCount, color: 'text-green-500', icon: CheckCircle },
+          { label: 'Degraded', count: degradedCount, color: 'text-amber-500', icon: AlertTriangle },
+          { label: 'Maintenance', count: maintenanceCount, color: 'text-blue-500', icon: Clock },
+          { label: 'Total Outage', count: outageCount, color: 'text-red-500', icon: XCircle },
         ].map((stat) => (
           <div key={stat.label} className="bg-muted/20 border border-border/40 rounded-2xl p-4 flex items-center justify-between">
             <div>
@@ -111,7 +123,7 @@ export const ServiceStatusSettings = () => {
             >
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center text-brand-blue group-hover:bg-brand-blue/10 transition-colors shrink-0">
-                  {service.icon}
+                  {getIcon(service.id)}
                 </div>
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
@@ -140,11 +152,14 @@ export const ServiceStatusSettings = () => {
                     <div className="text-[10px] font-bold uppercase text-muted-foreground">Enabled</div>
                     <div className="text-xs font-medium italic text-muted-foreground">System bypass</div>
                   </div>
-                  <Switch checked={service.enabled} className="data-[state=checked]:bg-brand-blue" />
+                  <Switch checked={true} className="data-[state=checked]:bg-brand-blue" />
                 </div>
               </div>
             </div>
           ))}
+          {services.length === 0 && !loading && (
+             <div className="text-center py-8 text-muted-foreground text-sm">No services found.</div>
+          )}
         </div>
       </div>
 
@@ -187,7 +202,7 @@ export const ServiceStatusSettings = () => {
       <div className="flex items-center justify-between pt-6 border-t border-border/40">
         <p className="text-xs text-muted-foreground italic flex items-center gap-2">
           <Clock className="h-3 w-3" />
-          Last snapshot taken {services[0].lastUpdated}
+          Last snapshot taken {services.length > 0 ? services[0].lastUpdated : 'N/A'}
         </p>
         <div className="flex gap-3">
           <Button variant="ghost" className="text-xs font-bold uppercase tracking-widest">Reset</Button>

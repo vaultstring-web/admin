@@ -43,28 +43,28 @@ interface MerchantListProps {
 }
 
 // Default generate function (used if no merchants are provided)
-function makeMock(n = 24): SimplifiedMerchant[] {
-  const categories = ["Retail", "Services", "Food", "Travel", "SaaS"];
-  const statuses: SimplifiedMerchant["verificationStatus"][] = [
-    "pending",
-    "approved",
-    "rejected",
-  ];
-  const accounts: SimplifiedMerchant["accountStatus"][] = ["active", "suspended"];
-
-  return Array.from({ length: n }).map((_, i) => ({
-    id: `M-${1000 + i}`,
-    businessName: `Merchant ${i + 1}`,
-    registrationDate: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
-    verificationStatus: statuses[i % statuses.length],
-    accountStatus: accounts[i % accounts.length],
-    category: categories[i % categories.length],
-    contact: `contact+${i}@example.com`,
-    email: `contact+${i}@example.com`,
-    phone: `+1 (555) ${1000 + i.toString().padStart(4, '0')}`,
-    riskScore: (i * 13) % 100
-  }));
-}
+// function makeMock(n = 24): SimplifiedMerchant[] {
+//   const categories = ["Retail", "Services", "Food", "Travel", "SaaS"];
+//   const statuses: SimplifiedMerchant["verificationStatus"][] = [
+//     "pending",
+//     "approved",
+//     "rejected",
+//   ];
+//   const accounts: SimplifiedMerchant["accountStatus"][] = ["active", "suspended"];
+// 
+//   return Array.from({ length: n }).map((_, i) => ({
+//     id: `M-${1000 + i}`,
+//     businessName: `Merchant ${i + 1}`,
+//     registrationDate: new Date(Date.now() - i * 86400000).toISOString().slice(0, 10),
+//     verificationStatus: statuses[i % statuses.length],
+//     accountStatus: accounts[i % accounts.length],
+//     category: categories[i % categories.length],
+//     contact: `contact+${i}@example.com`,
+//     email: `contact+${i}@example.com`,
+//     phone: `+1 (555) ${1000 + i.toString().padStart(4, '0')}`,
+//     riskScore: (i * 13) % 100
+//   }));
+// }
 
 export default function MerchantList({ 
   merchants, 
@@ -95,8 +95,8 @@ export default function MerchantList({
   
   const perPage = controlledLimit || 10;
 
-  // Use provided merchants or generate mock data
-  const data = useMemo(() => merchants || makeMock(56), [merchants]);
+  // Use provided merchants
+  const data = useMemo(() => merchants || [], [merchants]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

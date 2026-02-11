@@ -29,6 +29,7 @@ export interface KYCApplication {
   assignedTo?: string;
   lastReviewedAt?: string;
   notes?: string;
+  email?: string;
 }
 
 
@@ -56,6 +57,8 @@ export interface FlaggedTransaction {
 
 export enum AuditAction {
   LOGIN = 'LOGIN',
+  LOGIN_SUCCESS = 'LOGIN_SUCCESS',
+  LOGIN_FAILED = 'LOGIN_FAILED',
   LOGOUT = 'LOGOUT',
   CREATE = 'CREATE',
   UPDATE = 'UPDATE',

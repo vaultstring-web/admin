@@ -37,6 +37,9 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
       [AuditAction.DELETE]: 'bg-semantic-error-light/10 text-semantic-error-light border-semantic-error-light/20',
       [AuditAction.APPROVE]: 'bg-primary text-white border-transparent',
       [AuditAction.REJECT]: 'bg-semantic-error-dark text-white border-transparent',
+      [AuditAction.LOGIN_SUCCESS]: 'bg-green-100 text-green-700 border-green-200',
+      [AuditAction.LOGIN_FAILED]: 'bg-red-100 text-red-700 border-red-200',
+      [AuditAction.LOGIN]: 'bg-blue-100 text-blue-700 border-blue-200',
     };
 
     return (

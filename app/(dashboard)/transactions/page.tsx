@@ -7,7 +7,7 @@ import { TransactionFilters } from '@/components/transactions/TransactionFilters
 import { FlagTransactionDialog } from '@/components/transactions/FlagTransactionDialog';
 import { TransactionStats } from '@/components/transactions/TransactionStats';
 import { type Transaction } from '@/components/transactions/types';
-import { getTransactions, type Transaction as ApiTransaction } from '@/lib/api';
+import { getTransactions, flagTransaction, type Transaction as ApiTransaction } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
 import {
   Pagination,
@@ -38,6 +38,13 @@ export default function TransactionMonitoringPage() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => setMounted(true), []);
+
+  const mapStatus = (status: string): 'Completed' | 'Pending' | 'Failed' => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('completed') || s.includes('settled')) return 'Completed';
+    if (s.includes('failed') || s.includes('error')) return 'Failed';
+    return 'Pending';
+  };
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
@@ -130,13 +137,6 @@ export default function TransactionMonitoringPage() {
     fetchTransactions();
   }, [sessionLoading, isAuthenticated, page, limit, filters]);
 
-  const mapStatus = (status: string): 'Completed' | 'Pending' | 'Failed' => {
-    const s = (status || '').toLowerCase();
-    if (s.includes('completed') || s.includes('settled')) return 'Completed';
-    if (s.includes('failed') || s.includes('error')) return 'Failed';
-    return 'Pending';
-  };
-
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       const matchesSearch = tx.id.toLowerCase().includes(filters.search.toLowerCase()) ||
@@ -170,11 +170,19 @@ export default function TransactionMonitoringPage() {
     setFlagOpen(true);
   };
 
-  const handleFlagConfirm = () => {
+  const handleFlagConfirm = async () => {
     if (selectedTx && flagReason.trim()) {
-      // In a real app, you would update the transaction status via API
-      console.log(`Flagged transaction ${selectedTx.id}: ${flagReason}`);
-      alert(`Transaction ${selectedTx.id} has been flagged.`);
+      try {
+        await flagTransaction(selectedTx.id, flagReason);
+        // Update the local state to reflect the flagged status
+        setTransactions(prev => prev.map(t => 
+          t.id === selectedTx.id ? { ...t, flagged: true } : t
+        ));
+        alert(`Transaction ${selectedTx.id} has been flagged.`);
+      } catch (err) {
+        console.error('Failed to flag transaction:', err);
+        alert('Failed to flag transaction');
+      }
       setFlagOpen(false);
       setFlagReason('');
     }

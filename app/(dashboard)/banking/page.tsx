@@ -14,6 +14,7 @@ import {
   getPaymentGateways,
   getSettlements,
   getTransactions,
+  getForexRates,
   type BankAccount,
   type PaymentGateway,
   type Settlement,
@@ -33,6 +34,8 @@ export default function BankingPage() {
   const [settlementPage, setSettlementPage] = useState(1);
   const [settlementTotal, setSettlementTotal] = useState(0);
   const settlementLimit = 10;
+  
+  const [forexRates, setForexRates] = useState<Record<string, number>>({});
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,13 +124,24 @@ export default function BankingPage() {
           fetchSettlements()
         ]);
 
-        // Fetch bank accounts and gateways to build integrations
-        const [accountsRes, gatewaysRes] = await Promise.all([
+        const [accountsRes, gatewaysRes, forexRes] = await Promise.all([
           getBankAccounts(),
           getPaymentGateways(),
+          getForexRates(),
         ]);
 
         const integrationsList: BankIntegration[] = [];
+        
+        if (forexRes.data?.rates && Array.isArray(forexRes.data.rates)) {
+             const rates: Record<string, number> = {};
+             forexRes.data.rates.forEach((r: any) => {
+                 if (r.base_currency && r.target_currency && r.rate) {
+                     const pair = `${r.base_currency}/${r.target_currency}`;
+                     rates[pair] = parseFloat(r.rate);
+                 }
+             });
+             setForexRates(rates);
+        }
         
         if (accountsRes.data?.accounts) {
           accountsRes.data.accounts.forEach((acc: BankAccount) => {
@@ -233,6 +247,7 @@ export default function BankingPage() {
             total={settlementTotal}
             limit={settlementLimit}
             onPageChange={setSettlementPage}
+            rates={forexRates}
           />
         </div>
         

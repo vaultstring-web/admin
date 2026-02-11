@@ -1,9 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, UserCheck, AlertTriangle, ListFilter } from 'lucide-react';
+import { Shield, UserCheck, AlertTriangle, ListFilter, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 // Existing Imports
 import { ComplianceStats } from '@/components/compliance/ComplianceStats';
@@ -18,11 +24,23 @@ import {
   getAuditLogs,
   getComplianceReports,
   getTransactions,
-  type KYCApplication,
-  type AuditLog,
-  type ComplianceReport,
+  updateKYCApplicationStatus,
+  apiFetch,
+  type KYCApplication as ApiKYCApplication,
+  type AuditLog as ApiAuditLog,
+  type ComplianceReport as ApiComplianceReport,
 } from '@/lib/api';
+import { API_BASE } from '@/lib/constants';
 import { useSession } from '@/hooks/useSession';
+import { 
+  KYCApplication, 
+  KYCStatus, 
+  RiskLevel, 
+  AuditLog, 
+  AuditAction, 
+  ComplianceReport, 
+  ReportType 
+} from '@/components/compliance/types';
 
 export default function CompliancePage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -36,14 +54,58 @@ export default function CompliancePage() {
   const [kycLoading, setKycLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Review Modal State
+  const [selectedApp, setSelectedApp] = useState<KYCApplication | null>(null);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [processingDecision, setProcessingDecision] = useState(false);
+
   function handleReviewKYC(id: string): void {
-    // Implementation for reviewing KYC
-    console.log('Review KYC:', id);
+    const app = kycApplications.find(a => a.id === id);
+    if (app) {
+      setSelectedApp(app);
+      setRejectionReason('');
+      setIsReviewOpen(true);
+    }
+  }
+
+  async function handleDecision(status: 'verified' | 'rejected') {
+    if (!selectedApp) return;
+    
+    setProcessingDecision(true);
+    try {
+       const response = await updateKYCApplicationStatus(
+         selectedApp.id, 
+         status, 
+         status === 'rejected' ? rejectionReason : undefined
+       );
+
+       if (response.error) {
+         throw new Error(response.error);
+       }
+       
+       // Optimistic update
+       setKycApplications(prev => prev.filter(a => a.id !== selectedApp.id));
+       toast.success(`Application ${status === 'verified' ? 'approved' : 'rejected'} successfully`);
+       setIsReviewOpen(false);
+    } catch (err: any) {
+      console.error('Failed to process application:', err);
+      toast.error(err.message || 'Failed to process application');
+    } finally {
+      setProcessingDecision(false);
+    }
   }
 
   function handleInvestigateTransaction(id: string): void {
-    // Implementation for investigating transaction
+    // Navigate to transaction details or open a modal
+    // For now, we'll just show a toast, but in a real app we'd navigate
     console.log('Investigate transaction:', id);
+    toast.info(`Investigation started for TX: ${id}`);
+    
+    // Optimistic update to show it's being investigated
+    setFlagged(prev => prev.map(tx => 
+      tx.id === id ? { ...tx, status: 'investigating' as const } : tx
+    ));
   }
 
   useEffect(() => {
@@ -54,18 +116,28 @@ export default function CompliancePage() {
     const fetchKYCData = async () => {
       setKycLoading(true);
       try {
-        // If showHistory is false, fetch 'pending'. If true, fetch all (or processed).
-        // Let's assume history means everything or non-pending.
-        // For now, let's fetch 'pending' for queue, and 'verified' + 'rejected' for history if possible,
-        // or just all for history.
-        // Based on typical queue logic: Queue = Pending. History = All others.
-        // My backend supports single status. If I want multiple for history, I might need to make two calls or update backend.
-        // Let's just use empty status (All) for history for now, which includes pending, but user can filter client side if needed.
-        // Or better: fetch 'pending' for queue. Fetch empty (all) for history.
         const status = showHistory ? '' : 'pending';
         const kycRes = await getKYCApplications(status, 50, 0);
         if (kycRes.data?.applications) {
-          setKycApplications(kycRes.data.applications);
+          const mappedApps: KYCApplication[] = kycRes.data.applications.map((app: ApiKYCApplication) => ({
+            id: app.id,
+            customerId: app.user_id,
+            customerName: app.name || 'Unknown User',
+            customerType: 'individual', // Default
+            submittedAt: app.submitted_at,
+            status: (app.status as KYCStatus) || KYCStatus.PENDING,
+            riskLevel: RiskLevel.LOW, // Default
+            riskScore: 25, // Default
+            documents: app.documents?.map((doc: any) => ({
+              type: doc.document_type || doc.type || 'ID',
+              status: doc.verification_status || doc.status || 'pending',
+              url: doc.front_image_url || doc.url
+            })) || [],
+            assignedTo: app.reviewer_id,
+            lastReviewedAt: app.reviewed_at,
+            email: app.email,
+          }));
+          setKycApplications(mappedApps);
         }
       } catch (err) {
         console.error("Failed to fetch KYC applications", err);
@@ -80,7 +152,7 @@ export default function CompliancePage() {
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) return;
 
-    const fetchOtherData = async () => {
+    const fetchAllData = async () => {
       setLoading(true);
       setError(null);
 
@@ -88,17 +160,46 @@ export default function CompliancePage() {
         // Fetch audit logs
         const auditRes = await getAuditLogs(100, 0);
         if (auditRes.data?.logs) {
-          setAuditLogs(auditRes.data.logs);
+          const mappedLogs: AuditLog[] = auditRes.data.logs.map((log: ApiAuditLog) => ({
+            id: log.id,
+            userId: log.user_id || 'system',
+            userEmail: log.user_email || 'Unknown',
+            userRole: 'User', // Default
+            action: (log.action as AuditAction) || AuditAction.VIEW,
+            resourceType: log.entity_type || 'system',
+            resourceId: log.entity_id || 'unknown',
+            timestamp: log.created_at,
+            ipAddress: log.ip_address || 'Unknown',
+            userAgent: log.user_agent || 'Unknown',
+            metadata: {
+              status_code: log.status_code,
+              error_message: log.error_message,
+              request_id: log.request_id,
+              old_values: log.old_values,
+              new_values: log.new_values
+            },
+          }));
+          setAuditLogs(mappedLogs);
         }
 
         // Fetch compliance reports
         const reportsRes = await getComplianceReports(50, 0);
         if (reportsRes.data?.reports) {
-          setComplianceReports(reportsRes.data.reports);
+          const mappedReports: ComplianceReport[] = reportsRes.data.reports.map((r: ApiComplianceReport) => ({
+            id: r.id,
+            title: r.title,
+            type: (r.type as ReportType) || ReportType.KYC_SUMMARY,
+            period: { start: new Date().toISOString(), end: new Date().toISOString() }, // Default
+            generatedAt: r.generated_at,
+            generatedBy: 'System', // Default
+            status: (r.status as any) || 'generated',
+            downloadUrl: r.url
+          }));
+          setComplianceReports(mappedReports);
         }
 
         // Fetch flagged transactions
-        const txsRes = await getTransactions(100, 0, { status: 'failed' });
+        const txsRes = await getTransactions(100, 0, { status: 'flagged' });
         if (txsRes.data?.transactions) {
           const mapped: ComplianceTx[] = txsRes.data.transactions
             .slice(0, 20)
@@ -120,7 +221,7 @@ export default function CompliancePage() {
               const customerId = String(t.sender_id || '');
               const customerName =
                 t.sender_name || t.sender_email || (customerId ? `User-${customerId.slice(0, 8)}` : 'Unknown');
-              const timestamp = String(t.created_at || new Date().toISOString());
+              const timestamp = safeDate(t.created_at);
               const reason = String(t.status_reason || 'Review required');
               const factors: string[] = [];
               if (reason.toLowerCase().includes('kyc')) factors.push('KYC');
@@ -157,6 +258,7 @@ export default function CompliancePage() {
   }, [sessionLoading, isAuthenticated]);
 
   return (
+    <ErrorBoundary>
     <div className="p-8 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500">
       
       <div className="space-y-2">
@@ -280,8 +382,115 @@ export default function CompliancePage() {
           />
         </section>
       </div>
+
+      {/* KYC Review Modal */}
+      <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Review KYC Application</DialogTitle>
+            <DialogDescription>
+              Review submitted documents and verify customer identity.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedApp && (
+            <div className="space-y-6 py-4">
+              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg">
+                  {selectedApp.customerName?.[0] || 'U'}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-slate-900">{selectedApp.customerName || 'Unknown User'}</h4>
+                  <p className="text-sm text-slate-500">{selectedApp.email || `User ID: ${selectedApp.customerId}`}</p>
+                  <p className="text-xs text-slate-400 mt-1">Submitted: {new Date(selectedApp.submittedAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h5 className="text-sm font-medium text-slate-900">Submitted Documents</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   {/* Mock documents if none exist */}
+                   {(selectedApp.documents && selectedApp.documents.length > 0) ? (
+                      selectedApp.documents.map((doc, i) => {
+                        const filename = doc.url ? doc.url.split('/').pop() : `Document_${i+1}`;
+                        const fullUrl = doc.url ? `${API_BASE}${doc.url.startsWith('/') ? '' : '/'}${doc.url}` : '#';
+                        
+                        return (
+                        <a 
+                          key={i} 
+                          href={fullUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group no-underline"
+                        >
+                          <FileText className="text-indigo-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate text-slate-900">{filename}</p>
+                            <p className="text-xs text-slate-500">{doc.type}</p>
+                          </div>
+                          <Download size={16} className="text-slate-400 group-hover:text-slate-600" />
+                        </a>
+                      )})
+                   ) : (
+                      <>
+                        <div className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                          <FileText className="text-indigo-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">National_ID_Front.jpg</p>
+                            <p className="text-xs text-slate-500">1.2 MB</p>
+                          </div>
+                          <Download size={16} className="text-slate-400 group-hover:text-slate-600" />
+                        </div>
+                        <div className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                          <FileText className="text-indigo-500" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">Utility_Bill.pdf</p>
+                            <p className="text-xs text-slate-500">840 KB</p>
+                          </div>
+                          <Download size={16} className="text-slate-400 group-hover:text-slate-600" />
+                        </div>
+                      </>
+                   )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                 <Label>Rejection Reason (if rejecting)</Label>
+                 <Textarea 
+                   placeholder="Please provide a reason for rejection..." 
+                   value={rejectionReason}
+                   onChange={(e) => setRejectionReason(e.target.value)}
+                   className="min-h-[80px]"
+                 />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsReviewOpen(false)}>Cancel</Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button 
+                variant="destructive" 
+                className="flex-1 sm:flex-none gap-2"
+                onClick={() => handleDecision('rejected')}
+                disabled={processingDecision}
+              >
+                <XCircle size={16} /> Reject
+              </Button>
+              <Button 
+                className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 gap-2"
+                onClick={() => handleDecision('verified')}
+                disabled={processingDecision}
+              >
+                <CheckCircle size={16} /> Approve
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

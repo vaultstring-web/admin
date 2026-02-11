@@ -7,7 +7,7 @@ import { ForexStatus } from "@/components/dashboard/ForexStatus";
 import { AlertsSection } from "@/components/dashboard/AlertsSection";
 import { TransactionVolumeChart } from "@/components/reports/TransactionVolumeChart";
 import { useSession } from "@/hooks/useSession";
-import { getUsers, getForexRates, getSystemStats, getTransactionVolume, getRiskAlerts } from "@/lib/api";
+import { getUsers, getForexRates, getSystemStats, getTransactionVolume, getRiskAlerts, getSystemStatus } from "@/lib/api";
 import type { DashboardData, Alert } from "@/components/dashboard/types";
 
 export default function DashboardPage() {
@@ -32,13 +32,15 @@ export default function DashboardPage() {
           statsResponse, 
           volumeResponse, 
           alertsResponse,
-          forexResponse
+          forexResponse,
+          statusResponse
         ] = await Promise.all([
           getUsers(1000, 0), // Fetch more users to get accurate counts
           getSystemStats(),
           getTransactionVolume(6), // Get last 6 months for chart and trend calculation
           getRiskAlerts(10, 0),
           getForexRates(),
+          getSystemStatus(),
         ]);
 
         // Process Users Data
@@ -108,22 +110,31 @@ export default function DashboardPage() {
           (r.from_currency === "CNY" && r.to_currency === "MWK")
         )?.rate || 0.0085;
 
+        // Process System Status
+        const services = statusResponse.data?.services || [];
+        // Calculate averages from real service data
+        const totalUptime = services.reduce((acc: number, curr: any) => acc + curr.uptime, 0);
+        const avgUptime = services.length > 0 ? totalUptime / services.length : 100;
+        
+        const totalLatency = services.reduce((acc: number, curr: any) => acc + (curr.latency_ms || 0), 0);
+        const avgLatency = services.length > 0 ? totalLatency / services.length : 0;
+
         const dashboardData: DashboardData = {
           transactions: {
             current: stats.total_transactions,
-            previous: Math.floor(stats.total_transactions * 0.9), // Mock previous for total txs as we don't have monthly count history in stats yet
-            trend: 10, 
+            previous: 0, 
+            trend: 0, 
           },
           users: {
             customers: {
               current: customers,
-              previous: Math.floor(customers * 0.95),
-              trend: 5,
+              previous: 0,
+              trend: 0,
             },
             merchants: {
               current: merchants,
-              previous: Math.floor(merchants * 0.98),
-              trend: 2,
+              previous: 0,
+              trend: 0,
             },
           },
           volume: {
@@ -143,17 +154,18 @@ export default function DashboardPage() {
               trend: calculateTrend(zmwVolume, zmwPrev),
             },
           },
+          volumeHistory: volumes,
           earnings: {
             total: Number(stats.total_fees),
             currency: "MWK",
-            trend: 8.5, // Mock trend for earnings
+            trend: 0,
           },
           health: {
-            uptime24h: 99.9,
-            uptime30d: 99.7,
-            avgLatencyMs: 145,
+            uptime24h: Number(avgUptime.toFixed(2)),
+            uptime30d: Number(avgUptime.toFixed(2)), // Use average uptime as proxy for 30d history
+            avgLatencyMs: Math.round(avgLatency),
             errorRate: (stats.flagged / (stats.total_transactions || 1)) * 100, // Real error/risk rate
-            processingLatencyMs: 120,
+            processingLatencyMs: services.find((s: any) => s.id === 'core-api')?.latency_ms || 0,
           },
           forex: {
             pair: "MWK/CNY",
@@ -180,7 +192,7 @@ export default function DashboardPage() {
         setData({
           transactions: { current: 0, previous: 0, trend: 0 },
           users: { customers: { current: 0, previous: 0, trend: 0 }, merchants: { current: 0, previous: 0, trend: 0 } },
-          volume: { mwk: { current: 0, previous: 0, trend: 0 }, cny: { current: 0, previous: 0, trend: 0 } },
+          volume: { mwk: { current: 0, previous: 0, trend: 0 }, cny: { current: 0, previous: 0, trend: 0 }, zmw: { current: 0, previous: 0, trend: 0 } },
           earnings: { total: 0, currency: 'MWK', trend: 0 },
           health: { uptime24h: 0, uptime30d: 0, avgLatencyMs: 0, errorRate: 0, processingLatencyMs: 0 },
           forex: { pair: "MWK/CNY", rate: 0, status: "Unavailable", lastUpdated: new Date().toISOString(), trend: "neutral" },

@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { BlockchainHeader, NetworkStatus } from '@/components/blockchain/Header';
-import { BlockTable } from '@/components/blockchain/BlockTable';
+import { BlockchainNetworkList } from '@/components/blockchain/BlockchainNetworkList';
+import { TransactionTable } from '@/components/blockchain/TransactionTable';
 import { WalletTable } from '@/components/blockchain/WalletTable';
 import { SearchSection } from '@/components/blockchain/SearchSection';
 import { VerificationSection } from '@/components/blockchain/VerificationSection';
@@ -11,6 +12,9 @@ import {
   getBlockchainNetworks,
   getBlockchainTransactions,
   getWalletAddresses,
+  addBlockchainNetwork,
+  updateBlockchainNetwork,
+  deleteBlockchainNetwork,
   type BlockchainNetwork,
   type BlockchainTransaction,
   type WalletAddress,
@@ -102,6 +106,61 @@ export default function BlockchainPage() {
     fetchBlockchainData();
   }, [sessionLoading, isAuthenticated]);
 
+  const handleAddNetwork = async (network: any) => {
+    try {
+      const response = await addBlockchainNetwork({
+        name: network.name,
+        channel: network.type === 'private' ? 'default' : 'public',
+        rpc_url: network.rpcUrl,
+        chain_id: network.chainId,
+        symbol: network.symbol,
+      });
+      
+      if (response.data) {
+         setNetworks(prev => [...prev, response.data!]);
+      } else {
+         throw new Error(response.error || 'Failed to add network');
+      }
+    } catch (err) {
+      console.error('Failed to add network:', err);
+      throw err; 
+    }
+  };
+
+  const handleUpdateNetwork = async (id: string, network: any) => {
+    try {
+      const response = await updateBlockchainNetwork(id, {
+           name: network.name,
+           channel: network.type === 'private' ? 'default' : 'public',
+           rpc_url: network.rpcUrl,
+           chain_id: network.chainId,
+           symbol: network.symbol,
+      });
+      
+      if (response.data) {
+           setNetworks(prev => prev.map(n => n.network_id === id ? response.data! : n));
+      } else {
+           throw new Error(response.error || 'Failed to update network');
+      }
+    } catch (err) {
+      console.error('Failed to update network:', err);
+      throw err;
+    }
+  };
+
+  const handleDeleteNetwork = async (id: string) => {
+    try {
+      const response = await deleteBlockchainNetwork(id);
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      setNetworks(prev => prev.filter(n => n.network_id !== id));
+    } catch (err) {
+       console.error('Failed to delete network:', err);
+       throw err;
+    }
+  };
+
   const handleSearch = async (query: string) => {
     setIsSearching(true);
     setSearchError('');
@@ -171,8 +230,16 @@ export default function BlockchainPage() {
   // Calculate current height from latest network or transaction
   const currentHeight = networks[0]?.height || transactions[0]?.block_number || 0;
   
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Calculate last update time
   const getLastUpdateTime = () => {
+    if (!mounted) return 'Loading...';
+    
     const latestNetwork = networks[0];
     if (!latestNetwork?.last_block_time) return '2 minutes ago';
     
@@ -192,16 +259,6 @@ export default function BlockchainPage() {
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays} days ago`;
   };
-
-  // Map transactions to blocks format for BlockTable
-  const blocks = transactions.map((tx, index) => ({
-    blockNumber: tx.block_number || index + 1,
-    blockHash: `hash_${tx.block_number || index + 1}`,
-    dataHash: `data_${tx.block_number || index + 1}`,
-    timestamp: tx.timestamp,
-    txCount: transactions.filter(t => t.block_number === tx.block_number).length || 1,
-    channelId: tx.channel || 'main',
-  })).sort((a, b) => b.blockNumber - a.blockNumber);
 
   if (sessionLoading || loading) {
     return (
@@ -240,16 +297,23 @@ export default function BlockchainPage() {
         peerCount={networks[0]?.peer_count || 4}
         lastUpdate={getLastUpdateTime()}
       />
+
+      <BlockchainNetworkList 
+        networks={networks} 
+        onAddNetwork={handleAddNetwork}
+        onUpdateNetwork={handleUpdateNetwork}
+        onDeleteNetwork={handleDeleteNetwork}
+      />
       
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-8">
           <SearchSection 
             onSearch={handleSearch} 
-            isSearching={isSearching}
+            isLoading={isSearching}
             error={searchError}
             result={searchResult}
           />
-          <BlockTable 
+          <TransactionTable 
             transactions={transactions} 
             page={txPage}
             total={txTotal}

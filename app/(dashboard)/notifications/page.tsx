@@ -1,15 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NotificationList } from '@/components/notifications/NotificationList';
 import { NotificationStats } from '@/components/notifications/NotificationStats';
 import { NotificationPreferences } from '@/components/notifications/NotificationPreferences';
-import { MOCK_NOTIFICATIONS } from '@/components/notifications/constants';
+import { getNotifications } from '@/lib/api';
 import { Notification, NotificationStatus } from '@/components/notifications/types';
-import { Bell } from 'lucide-react';
+import { Bell, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await getNotifications();
+        if (response.data) {
+          // Cast strictly because api.ts Notification might be slightly different or missing enums
+          setNotifications(response.data.notifications as unknown as Notification[]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+        toast.error('Failed to load notifications');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchNotifications();
+  }, []);
 
   const handleMarkAsRead = (id: string) => {
     setNotifications(prev =>
@@ -34,6 +54,14 @@ export default function NotificationsPage() {
   const handleDelete = (id: string) => {
     setNotifications(prev => prev.filter(notification => notification.id !== id));
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

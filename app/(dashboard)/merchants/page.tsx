@@ -5,12 +5,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import MerchantsList from "@/components/merchants/MerchantList";
 import MerchantDetail from "@/components/merchants/MerchantDetail";
 import { MerchantCard } from "@/components/merchants/MerchantCard";
-import { MOCK_MERCHANTS } from "@/components/merchants/constants";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { API_BASE } from "@/lib/constants";
+import { updateUserStatus, updateKYCStatus } from "@/lib/api";
 import {
   Pagination,
   PaginationContent,
@@ -61,6 +61,8 @@ export default function MerchantsPage() {
     owners: { name: string; email: string; phone: string; ownershipPercentage: number }[];
     bankAccounts: { bankName: string; accountNumber: string; accountHolder: string; currency: string; isPrimary: boolean }[];
   } | null>(null);
+
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const mapKYC = (s?: string) => {
@@ -116,7 +118,7 @@ export default function MerchantsPage() {
       }
     };
     fetchMerchants();
-  }, [page, limit]);
+  }, [page, limit, refreshKey]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -193,10 +195,30 @@ export default function MerchantsPage() {
       .catch(() => {});
   };
 
-  // Handle status updates (mock function)
-  const handleUpdateStatus = (id: string, action: string, reason?: string) => {
-    console.log(`Updated merchant ${id}: ${action}`, reason);
-    // In a real app, this would update the merchant data
+  // Handle status updates
+  const handleUpdateStatus = async (id: string, action: string, reason?: string) => {
+    try {
+      if (action === "approve") {
+        await updateKYCStatus(id, "verified", reason);
+      } else if (action === "reject") {
+        await updateKYCStatus(id, "rejected", reason);
+      } else if (action === "suspend") {
+        await updateUserStatus(id, false, reason);
+      } else if (action === "unsuspend") {
+        await updateUserStatus(id, true, reason);
+      }
+      
+      // Trigger list refresh
+      setRefreshKey(prev => prev + 1);
+
+      // Refresh detail if selected
+      if (selectedDetail && selectedDetail.id === id) {
+         handleSelectMerchant(id); 
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      alert("Failed to update status");
+    }
   };
 
   return (
@@ -337,7 +359,7 @@ export default function MerchantsPage() {
                     className="mt-4"
                     onClick={() => setSelectedMerchantId(simpleMerchants[0]?.id || "")}
                   >
-                    View Sample Merchant
+                    Select a Merchant
                   </Button>
                 </div>
               </CardContent>

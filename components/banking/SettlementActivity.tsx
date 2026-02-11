@@ -25,6 +25,7 @@ interface SettlementActivityProps {
   total?: number;
   limit?: number;
   onPageChange?: (page: number) => void;
+  rates?: Record<string, number>;
 }
 
 export const SettlementActivity: React.FC<SettlementActivityProps> = ({ 
@@ -32,25 +33,55 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
   page = 1,
   total = 0,
   limit = 10,
-  onPageChange
+  onPageChange,
+  rates = {}
 }) => {
   const [currency, setCurrency] = useState<'MWK' | 'CNY' | 'ZMW'>('MWK');
 
   const totalPages = Math.ceil(total / limit)
-  // ... rest of the component
-  
-  // Simple conversion mock
-  const conversionRate = currency === 'MWK' ? 1 : currency === 'ZMW' ? 1/65 : 1 / 240;
 
-  const chartData = useMemo(() => [
-    { name: 'Mon', vol: 4500000 * conversionRate },
-    { name: 'Tue', vol: 3800000 * conversionRate },
-    { name: 'Wed', vol: 5100000 * conversionRate },
-    { name: 'Thu', vol: 4200000 * conversionRate },
-    { name: 'Fri', vol: 5800000 * conversionRate },
-    { name: 'Sat', vol: 2100000 * conversionRate },
-    { name: 'Sun', vol: 1500000 * conversionRate },
-  ], [conversionRate]);
+  // Calculate conversion rate based on selected currency
+  // Assuming rates are like "MWK/CNY", "MWK/USD" etc.
+  // Or maybe "CNY/MWK".
+  // Let's assume we want to convert everything TO the selected currency.
+  // This logic depends on what `rates` contains. 
+  // If we don't have rates, we default to 1 (no conversion displayed or 1:1 fallback).
+  const getConversionRate = (from: string, to: string) => {
+      if (from === to) return 1;
+      const pair = `${from}/${to}`;
+      if (rates[pair]) return rates[pair];
+      
+      const reversePair = `${to}/${from}`;
+      if (rates[reversePair]) return 1 / rates[reversePair];
+      
+      return 1; // Fallback
+  };
+  
+  // Filter and aggregate batches for the chart based on selected currency
+  const chartData = useMemo(() => {
+    if (!batches || batches.length === 0) return [];
+
+    // We want to show ALL volume converted to the selected currency? 
+    // Or just volume OF that currency?
+    // The previous logic was `batches.filter(b => b.currency === currency)`.
+    // That means we only show batches that were natively in that currency.
+    // That seems safer than converting everything if we aren't sure of rates.
+    // So let's stick to filtering, but maybe we can use rates for something else later?
+    // Actually, if we filter, we don't need conversion for the chart values themselves (they are already in that currency).
+    // But maybe the user wants to see TOTAL volume in MWK (aggregating CNY and ZMW converted)?
+    // The UI has tabs for MWK, CNY, ZMW. It implies filtering by corridor/currency.
+    
+    const relevantBatches = batches.filter(b => b.currency === currency);
+    
+    // Group by day
+    const grouped = relevantBatches.reduce((acc, batch) => {
+      const day = new Date(batch.date).toLocaleDateString('en-US', { weekday: 'short' });
+      acc[day] = (acc[day] || 0) + batch.volume;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(grouped).map(([name, vol]) => ({ name, vol }));
+  }, [batches, currency]);
 
   const getStatusConfig = (status: string) => {
     const configs: Record<string, any> = {
@@ -186,7 +217,7 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
                 {batches.map((batch) => {
                   const config = getStatusConfig(batch.status);
                   const StatusIcon = config.icon;
-                  const convertedVolume = batch.volume * conversionRate;
+                  const convertedVolume = batch.volume * getConversionRate(batch.currency, currency);
                   
                   return (
                     <TableRow key={batch.id} className="group hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-colors border-slate-100 dark:border-slate-800">

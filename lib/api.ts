@@ -36,10 +36,23 @@ export async function apiFetch<T>(
 ): Promise<ApiResponse<T>> {
   const token = getAuthToken();
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
   };
+
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      options.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+    } else if (Array.isArray(options.headers)) {
+      options.headers.forEach(([key, value]) => {
+        headers[key] = value;
+      });
+    } else {
+      Object.assign(headers, options.headers);
+    }
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -97,8 +110,6 @@ export async function apiFetch<T>(
   }
 }
 
-// Duplicate definitions removed
-
 export interface SecurityEvent {
   id: string;
   type: string;
@@ -110,8 +121,6 @@ export interface SecurityEvent {
   reference?: string;
   flag_reason?: string;
 }
-
-// Duplicate getRiskAlerts removed
 
 export interface ExchangeRate {
   id: string;
@@ -127,7 +136,67 @@ export interface ExchangeRate {
   created_at: string;
 }
 
-// Duplicate getForexRates removed
+// ============================================================================
+// COMPLIANCE API
+// ============================================================================
+
+export interface KYCApplication {
+  id: string;
+  user_id: string;
+  name?: string;
+  email?: string;
+  submitted_at: string;
+  status: string;
+  risk_score?: number;
+  documents?: any[];
+  reviewer_id?: string;
+  reviewed_at?: string;
+}
+
+export async function getKYCApplications(
+  status?: string,
+  limit = 50,
+  offset = 0
+): Promise<ApiResponse<{ applications: KYCApplication[]; total?: number }>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  if (status) params.append('status', status);
+
+  return apiFetch<{ applications: KYCApplication[]; total?: number }>(
+    `/admin/compliance/kyc?${params.toString()}`
+  );
+}
+
+export async function updateKYCApplicationStatus(
+  id: string,
+  status: string,
+  reason?: string
+): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch<{ message: string }>(`/admin/compliance/kyc/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, reason }),
+  });
+}
+
+export interface ComplianceReport {
+  id: string;
+  title: string;
+  type: string;
+  generated_at: string;
+  url: string;
+  status: string;
+}
+
+export async function getComplianceReports(
+  limit = 50,
+  offset = 0
+): Promise<ApiResponse<{ reports: ComplianceReport[]; total?: number }>> {
+  return apiFetch<{ reports: ComplianceReport[]; total?: number }>(
+    `/admin/compliance/reports?limit=${limit}&offset=${offset}`
+  );
+}
 
 // ============================================================================
 // USER MANAGEMENT API
@@ -213,11 +282,18 @@ export async function updateUserRole(
 export interface AuditLog {
   id: string;
   action: string;
-  admin_id?: string;
   user_id?: string;
-  timestamp: string;
-  reason?: string;
-  details?: string;
+  user_email?: string;
+  entity_type?: string;
+  entity_id?: string;
+  ip_address?: string;
+  user_agent?: string;
+  status_code?: number;
+  error_message?: string;
+  created_at: string;
+  old_values?: any;
+  new_values?: any;
+  request_id?: string;
 }
 
 export async function getUserActivity(
@@ -289,35 +365,10 @@ export interface RiskAlert {
   flag_reason?: string;
 }
 
-export async function getRiskAlerts(limit = 50, offset = 0): Promise<ApiResponse<{ alerts: RiskAlert[]; limit: number; offset: number }>> {
-  // Fetch flagged transactions as risk alerts
-  const response = await apiFetch<TransactionsResponse>(`/admin/transactions?status=flagged&limit=${limit}&offset=${offset}`);
-  
-  if (response.error || !response.data) {
-    return { 
-      error: response.error,
-      data: { alerts: [], limit, offset } 
-    };
-  }
-
-  const alerts: RiskAlert[] = response.data.transactions.map(tx => ({
-    id: tx.id,
-    reference: tx.reference || 'N/A',
-    amount: tx.amount.toString(),
-    currency: tx.currency,
-    reason: tx.status_reason || 'Flagged transaction',
-    risk_score: 0, // Not currently available in transaction list
-    created_at: tx.created_at,
-    flag_reason: tx.status_reason
-  }));
-
-  return {
-    data: {
-      alerts,
-      limit: response.data.limit || limit,
-      offset: response.data.offset || offset
-    }
-  };
+export async function getRiskAlerts(limit = 50, offset = 0): Promise<ApiResponse<{ alerts: RiskAlert[]; total?: number }>> {
+  return apiFetch<{ alerts: RiskAlert[]; total?: number }>(
+    `/admin/risk/alerts?limit=${limit}&offset=${offset}`
+  );
 }
 
 export interface AuditLogEntry {
@@ -330,9 +381,38 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
-// getAuditLogs is defined in the ANALYTICS & REPORTS API section
+export interface APIKey {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  status: string;
+  expires_at: string;
+  created_at: string;
+  last_used?: string;
+  key?: string; // Only present on creation
+}
 
+export async function getAPIKeys(): Promise<ApiResponse<{ keys: APIKey[] }>> {
+  return apiFetch<{ keys: APIKey[] }>('/admin/api-keys');
+}
 
+export async function createAPIKey(
+  name: string,
+  scopes: string[],
+  expiresInDays: number
+): Promise<ApiResponse<APIKey>> {
+  return apiFetch<APIKey>('/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify({ name, scopes, expires_in_days: expiresInDays }),
+  });
+}
+
+export async function revokeAPIKey(id: string): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch<{ message: string }>(`/admin/api-keys/${id}`, {
+    method: 'DELETE',
+  });
+}
 
 // ============================================================================
 // TRANSACTION MANAGEMENT API
@@ -470,6 +550,9 @@ export interface BlockchainNetwork {
   peer_count?: number;
   last_block_time?: string;
   channel?: string;
+  rpc_url?: string;
+  chain_id?: string;
+  symbol?: string;
 }
 
 export interface BlockchainTransaction {
@@ -491,8 +574,37 @@ export interface WalletAddress {
   created_at?: string;
 }
 
+export type Wallet = WalletAddress;
+
+export async function getUserWallets(userId: string): Promise<ApiResponse<{ addresses: Wallet[] }>> {
+  return apiFetch<{ addresses: Wallet[] }>(`/admin/blockchain/wallets?user_id=${userId}`);
+}
+
 export async function getBlockchainNetworks(): Promise<ApiResponse<{ networks: BlockchainNetwork[] }>> {
   return apiFetch<{ networks: BlockchainNetwork[] }>('/admin/blockchain/networks');
+}
+
+export async function addBlockchainNetwork(network: Partial<BlockchainNetwork>): Promise<ApiResponse<BlockchainNetwork>> {
+  return apiFetch<BlockchainNetwork>('/admin/blockchain/networks', {
+    method: 'POST',
+    body: JSON.stringify(network),
+  });
+}
+
+export async function updateBlockchainNetwork(
+  id: string,
+  network: Partial<BlockchainNetwork>
+): Promise<ApiResponse<BlockchainNetwork>> {
+  return apiFetch<BlockchainNetwork>(`/admin/blockchain/networks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(network),
+  });
+}
+
+export async function deleteBlockchainNetwork(id: string): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch<{ message: string }>(`/admin/blockchain/networks/${id}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function getBlockchainTransactions(
@@ -516,18 +628,6 @@ export async function getWalletAddresses(
 // ============================================================================
 // ANALYTICS & REPORTS API
 // ============================================================================
-
-export interface AuditLog {
-  id: string;
-  action: string;
-  admin_id?: string;
-  user_id?: string;
-  resource_type?: string;
-  resource_id?: string;
-  details?: string;
-  ip_address?: string;
-  timestamp: string;
-}
 
 export interface SystemMetrics {
   total_users: number;
@@ -572,8 +672,8 @@ export async function getAuditLogs(
 }
 
 export async function getSystemMetrics(): Promise<ApiResponse<SystemMetrics>> {
-  // Map /admin/stats to SystemMetrics
-  const response = await apiFetch<SystemStats>('/admin/stats');
+  // Map /admin/analytics/metrics to SystemMetrics
+  const response = await apiFetch<SystemStats>('/admin/analytics/metrics');
   if (response.error || !response.data) {
     return { error: response.error };
   }
@@ -581,127 +681,73 @@ export async function getSystemMetrics(): Promise<ApiResponse<SystemMetrics>> {
   const stats = response.data;
   return {
     data: {
-      total_users: stats.active_users || 0, // Using active users as proxy for now
-      active_users: stats.active_users || 0,
+      total_users: stats.active_users,
+      active_users: stats.active_users,
       total_transactions: stats.total_transactions,
-      total_volume: Number(stats.total_volume),
-      total_earnings: Number(stats.total_fees),
-      failed_transactions: stats.flagged, // Using flagged as failed/problematic
-      pending_transactions: stats.pending + stats.pending_approvals,
-      last_updated: new Date().toISOString(),
+      total_volume: stats.total_volume,
+      total_earnings: stats.total_fees,
+      failed_transactions: stats.flagged,
+      pending_transactions: stats.pending,
+      last_updated: new Date().toISOString()
     }
   };
 }
 
 export async function getEarningsReport(
-  startDate: string,
-  endDate: string,
-  currency = 'MWK'
+  startDate?: string,
+  endDate?: string
 ): Promise<ApiResponse<{ reports: EarningsReport[] }>> {
-  return apiFetch<{ reports: EarningsReport[] }>(
-    `/admin/analytics/earnings?start_date=${startDate}&end_date=${endDate}&currency=${currency}`
-  );
+  const params = new URLSearchParams();
+  if (startDate) params.append('start_date', startDate);
+  if (endDate) params.append('end_date', endDate);
+
+  return apiFetch<{ reports: EarningsReport[] }>(`/admin/analytics/earnings?${params.toString()}`);
 }
 
 // ============================================================================
-// FOREX API
+// SYSTEM STATUS API
 // ============================================================================
 
-export interface ForexRate {
-  from_currency: string;
-  to_currency: string;
-  rate: number;
-  updated_at: string;
-}
-
-export async function getForexRates(): Promise<ApiResponse<{ rates: ForexRate[] }>> {
-  return apiFetch<{ rates: ForexRate[] }>('/forex/rates');
-}
-
-export async function getForexRate(from: string, to: string): Promise<ApiResponse<ForexRate>> {
-  return apiFetch<ForexRate>(`/forex/rates/${from}/${to}`);
-}
-
-// ============================================================================
-// COMPLIANCE API
-// ============================================================================
-
-export interface KYCApplication {
+export interface ServiceStatus {
   id: string;
-  user_id: string;
+  name: string;
+  description: string;
   status: string;
-  submitted_at: string;
-  reviewed_at?: string;
-  reviewer_id?: string;
-  documents?: any[];
-  name?: string;
-  email?: string;
+  lastUpdated: string;
+  uptime: number;
+  latency_ms?: number;
 }
 
-export interface ComplianceReport {
-  id: string;
-  report_type: string;
-  period: string;
-  generated_at: string;
-  status: string;
-  file_url?: string;
+export interface SystemStatusResponse {
+  services: ServiceStatus[];
 }
 
-export async function getKYCApplications(
-  status?: string,
-  limit = 50,
-  offset = 0
-): Promise<ApiResponse<{ applications: KYCApplication[]; total?: number }>> {
-  const params = new URLSearchParams({
-    limit: limit.toString(),
-    offset: offset.toString(),
-  });
-  if (status) params.append('status', status);
-
-  return apiFetch<{ applications: KYCApplication[]; total?: number }>(
-    `/admin/compliance/kyc?${params.toString()}`
-  );
+export async function getSystemStatus(): Promise<ApiResponse<SystemStatusResponse>> {
+  return apiFetch<SystemStatusResponse>('/admin/system/status');
 }
 
-export async function updateKYCApplicationStatus(
-  id: string,
-  status: string,
-  reason?: string
-): Promise<ApiResponse<{ message: string }>> {
-  return apiFetch(`/admin/compliance/kyc/${id}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ status, reason }),
-  });
-}
-
-export async function getComplianceReports(
-  limit = 50,
-  offset = 0
-): Promise<ApiResponse<{ reports: ComplianceReport[]; total?: number }>> {
-  return apiFetch<{ reports: ComplianceReport[]; total?: number }>(
-    `/admin/compliance/reports?limit=${limit}&offset=${offset}`
-  );
+export async function getForexRates(): Promise<ApiResponse<any>> {
+    return apiFetch('/forex/rates');
 }
 
 // ============================================================================
-// WALLET MANAGEMENT API
+// NOTIFICATIONS API
 // ============================================================================
 
-export interface Wallet {
+export interface Notification {
   id: string;
-  user_id: string;
-  wallet_address?: string;
-  currency: string;
+  title: string;
+  message: string;
+  type: string;
   status: string;
-  created_at: string;
+  timestamp: string;
+  actionUrl?: string;
+  actionText?: string;
+  metadata?: Record<string, unknown>;
+  userId?: string;
+  readAt?: string;
 }
 
-export interface WalletsResponse {
-  addresses: Wallet[];
-  total: number;
+export async function getNotifications(limit = 50, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; total?: number }>> {
+  return apiFetch<{ notifications: Notification[]; total?: number }>(`/admin/notifications?limit=${limit}&offset=${offset}`);
 }
-
-export async function getUserWallets(userId: string): Promise<ApiResponse<WalletsResponse>> {
-  return apiFetch<WalletsResponse>(`/admin/blockchain/wallets?user_id=${userId}`);
-}
-
