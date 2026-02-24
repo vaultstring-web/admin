@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Server, Activity, Globe, Shield, Plus, Zap, Lock, CheckCircle2, AlertCircle, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Server, Activity, Globe, Shield, Plus, Lock, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { BlockchainNetwork } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
+interface NetworkFormData {
+  name: string;
+  type: string;
+  rpcUrl: string;
+  chainId: string;
+  symbol: string;
+}
+
 interface BlockchainNetworkListProps {
   networks: BlockchainNetwork[];
-  onAddNetwork: (network: any) => Promise<void>;
-  onUpdateNetwork?: (id: string, network: any) => Promise<void>;
+  onAddNetwork: (network: NetworkFormData) => Promise<void>;
+  onUpdateNetwork?: (id: string, network: NetworkFormData) => Promise<void>;
   onDeleteNetwork?: (id: string) => Promise<void>;
 }
 
@@ -23,7 +31,7 @@ export function BlockchainNetworkList({ networks: initialNetworks, onAddNetwork,
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<NetworkFormData>({
     name: '',
     type: 'public',
     rpcUrl: '',
@@ -48,7 +56,7 @@ export function BlockchainNetworkList({ networks: initialNetworks, onAddNetwork,
       setIsAddModalOpen(false);
       setFormData({ name: '', type: 'public', rpcUrl: '', chainId: '', symbol: '' });
       toast.success('Blockchain network added successfully');
-    } catch (error) {
+    } catch {
       toast.error('Failed to add network');
     } finally {
       setIsLoading(false);
@@ -78,7 +86,7 @@ export function BlockchainNetworkList({ networks: initialNetworks, onAddNetwork,
       setEditingId(null);
       setFormData({ name: '', type: 'public', rpcUrl: '', chainId: '', symbol: '' });
       toast.success('Network updated successfully');
-    } catch (error) {
+    } catch {
       toast.error('Failed to update network');
     } finally {
       setIsLoading(false);
@@ -92,7 +100,7 @@ export function BlockchainNetworkList({ networks: initialNetworks, onAddNetwork,
           await onDeleteNetwork(id);
         }
         toast.success('Network removed successfully');
-      } catch (error) {
+      } catch {
         toast.error('Failed to remove network');
       }
     }

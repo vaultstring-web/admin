@@ -16,15 +16,10 @@ import {
   updateUserRole,
   updateUserProfile,
   type User,
+  type AuditLog,
 } from '@/lib/api';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function UsersPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -32,6 +27,7 @@ export default function UsersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'directory' | 'detail' | 'insights'>('directory');
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -85,7 +81,7 @@ export default function UsersPage() {
             firstName: u.first_name || '',
             lastName: u.last_name || '',
             email: u.email,
-            role: (u as any).user_type ? String((u as any).user_type) : undefined,
+            role: u.user_type || undefined,
             phone: u.phone || '',
             registrationDate: u.created_at,
             kycStatus: mapKYC(u.kyc_status),
@@ -110,9 +106,11 @@ export default function UsersPage() {
         } else {
           setCustomers([]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch users:', err);
-        setError(err?.message || 'Failed to load users');
+        const message =
+          err instanceof Error ? err.message : 'Failed to load users';
+        setError(message);
         setCustomers([]);
       } finally {
         setLoading(false);
@@ -164,28 +162,62 @@ export default function UsersPage() {
 
           // Fetch activity logs
           const activityResponse = await getUserActivity(selectedCustomerId);
-          const auditLogs = activityResponse.data?.logs || [];
+          const auditLogs: AuditLog[] = activityResponse.data?.logs || [];
+
+          const loginSuccessLogs = auditLogs.filter(log => log.action === 'LOGIN_SUCCESS');
+          const loginFailedLogs = auditLogs.filter(log => log.action === 'LOGIN_FAILED');
+          const loginAttempts = loginSuccessLogs.length + loginFailedLogs.length;
+          const failedLoginAttempts = loginFailedLogs.length;
+
+          const lastLogin = loginSuccessLogs[0];
+          const lastFailedLogin = loginFailedLogs[0];
+
+          const ipSet = new Set<string>();
+          auditLogs.forEach(log => {
+            if (log.ip_address) {
+              ipSet.add(log.ip_address);
+            }
+          });
 
           const customerDetail: Customer = {
             id: u.id,
             firstName: u.first_name || '',
             lastName: u.last_name || '',
             email: u.email,
-            role: (u as any).user_type ? String((u as any).user_type) : undefined,
+            role: u.user_type || undefined,
             phone: u.phone || '',
             registrationDate: u.created_at,
             kycStatus: mapKYC(u.kyc_status),
             accountStatus: mapAccount(u.is_active),
-            riskScore: typeof u.risk_score === 'number' ? Math.min(100, Math.max(0, u.risk_score)) : 0,
+            riskScore:
+              typeof u.risk_score === 'number'
+                ? Math.min(100, Math.max(0, u.risk_score))
+                : 0,
             avatarUrl: '/placeholder-user.jpg',
             kycDocuments: [],
-            auditLogs: auditLogs.map((log: any) => ({
+            auditLogs: auditLogs.map((log) => ({
               id: log.id || `LOG-${Date.now()}`,
               action: log.action || 'UNKNOWN',
-              adminId: log.admin_id || 'SYSTEM',
-              timestamp: log.timestamp || new Date().toISOString(),
-              reason: log.details || log.reason,
+              adminId: log.user_email || 'SYSTEM',
+              timestamp: log.created_at || new Date().toISOString(),
+              reason:
+                log.action === 'LOGIN_SUCCESS'
+                  ? `Login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}`
+                  : log.action === 'LOGIN_FAILED'
+                  ? `Failed login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}${log.error_message ? ` (${log.error_message})` : ''}`
+                  : log.reason ||
+                    (log.new_values && JSON.stringify(log.new_values)) ||
+                    log.error_message ||
+                    log.request_id ||
+                    '',
             })),
+            loginAttempts,
+            failedLoginAttempts,
+            lastLoginAt: lastLogin?.created_at,
+            lastLoginIP: lastLogin?.ip_address,
+            lastFailedLoginAt: lastFailedLogin?.created_at,
+            lastFailedLoginIP: lastFailedLogin?.ip_address,
+            uniqueLoginIPs: ipSet.size || undefined,
             address: {
               street: '',
               city: '',
@@ -196,7 +228,7 @@ export default function UsersPage() {
 
           setSelectedCustomer(customerDetail);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch customer detail:', err);
         // Try to use cached version
         const cached = customers.find(c => c.id === selectedCustomerId);
@@ -228,7 +260,7 @@ export default function UsersPage() {
       }
 
       if (response?.error) {
-        alert(`Failed to update status: ${response.error}`);
+        toast.error(`Failed to update status: ${response.error}`);
         return;
       }
 
@@ -274,14 +306,16 @@ export default function UsersPage() {
         // Update in list
         setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
         
-        // If this is the selected customer, update it
+        // If this is the selected customer, update the detail view as well
         if (selectedCustomerId === id) {
-          // Will be handled by CustomerDetail component refresh
+          setSelectedCustomer(updatedCustomer);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update status:', err);
-      alert(`Failed to update status: ${err?.message || 'Unknown error'}`);
+      const message =
+        err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to update status: ${message}`);
     }
   };
 
@@ -290,7 +324,7 @@ export default function UsersPage() {
     try {
       const response = await updateUserProfile(id, updates);
       if (response.error) {
-        alert(`Failed to update profile: ${response.error}`);
+        toast.error(`Failed to update profile: ${response.error}`);
         return;
       }
       const userResponse = await getUserById(id);
@@ -314,7 +348,7 @@ export default function UsersPage() {
           firstName: u.first_name || '',
           lastName: u.last_name || '',
           email: u.email,
-          role: (u as any).user_type ? String((u as any).user_type) : undefined,
+          role: u.user_type || undefined,
           phone: u.phone || '',
           registrationDate: u.created_at,
           kycStatus: mapKYC(u.kyc_status),
@@ -330,14 +364,16 @@ export default function UsersPage() {
             zip: '',
           },
         };
-        setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
+        setCustomers(prev => prev.map(c => (c.id === id ? updatedCustomer : c)));
         if (selectedCustomerId === id) {
           setSelectedCustomer(updatedCustomer);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update profile:', err);
-      alert(`Failed to update profile: ${err?.message || 'Unknown error'}`);
+      const message =
+        err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to update profile: ${message}`);
     }
   };
 
@@ -346,7 +382,7 @@ export default function UsersPage() {
     try {
       const response = await updateUserRole(id, role, reason);
       if (response?.error) {
-        alert(`Failed to update role: ${response.error}`);
+        toast.error(`Failed to update role: ${response.error}`);
         return;
       }
       const userResponse = await getUserById(id);
@@ -370,7 +406,7 @@ export default function UsersPage() {
           firstName: u.first_name || '',
           lastName: u.last_name || '',
           email: u.email,
-          role: (u as any).user_type ? String((u as any).user_type) : undefined,
+          role: u.user_type || undefined,
           phone: u.phone || '',
           registrationDate: u.created_at,
           kycStatus: mapKYC(u.kyc_status),
@@ -386,24 +422,22 @@ export default function UsersPage() {
             zip: '',
           },
         };
-        setCustomers(prev => prev.map(c => c.id === id ? updatedCustomer : c));
+        setCustomers(prev => prev.map(c => (c.id === id ? updatedCustomer : c)));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update role:', err);
-      alert(`Failed to update role: ${err?.message || 'Unknown error'}`);
+      const message =
+        err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to update role: ${message}`);
     }
   };
 
   // Handle user deletion
   const handleDeleteUser = async (id: string, reason?: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       const response = await deleteUser(id, reason);
       if (response.error) {
-        alert(`Failed to delete user: ${response.error}`);
+        toast.error(`Failed to delete user: ${response.error}`);
         return;
       }
 
@@ -413,16 +447,21 @@ export default function UsersPage() {
       // If viewing this user, go back to list
       if (selectedCustomerId === id) {
         setSelectedCustomerId(null);
+        setSelectedCustomer(null);
+        setActiveTab('directory');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete user:', err);
-      alert(`Failed to delete user: ${err?.message || 'Unknown error'}`);
+      const message =
+        err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to delete user: ${message}`);
     }
   };
 
   // Handle back from detail view
   const handleBackToList = () => {
     setSelectedCustomerId(null);
+    setActiveTab('directory');
   };
 
   if (loading && customers.length === 0) {
@@ -438,83 +477,120 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-neutral-light-bg dark:bg-neutral-dark-bg text-neutral-light-text dark:text-neutral-dark-text transition-colors">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
         {error && (
           <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
           </div>
         )}
-        
-        {loadingDetail && selectedCustomerId ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Loading user details...</p>
-            </div>
-          </div>
-        ) : selectedCustomer ? (
-          <CustomerDetail 
-            customer={selectedCustomer}
-            onBack={handleBackToList}
-            onUpdateStatus={handleUpdateStatus}
-            onUpdateRole={handleUpdateRole}
-            onUpdateProfile={handleUpdateProfile}
-            onDelete={handleDeleteUser}
-          />
-        ) : (
-          <CustomerList 
-            customers={customers}
-            onSelectCustomer={setSelectedCustomerId}
-            loading={loading}
-            page={page}
-            total={total}
-            limit={limit}
-            onPageChange={setPage}
-          />
-        )}
 
-        {/* Stats Footer */}
-        <div className="mt-12 pt-8 border-t border-neutral-light-border dark:border-neutral-dark-border">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-              <div className="text-2xl font-bold text-neutral-light-heading dark:text-neutral-dark-heading">
-                {total}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-6">
+          <TabsList className="inline-flex h-10 items-center justify-center rounded-xl bg-neutral-100/60 dark:bg-neutral-900/60 p-1.5 border border-neutral-light-border/60 dark:border-neutral-dark-border/60">
+            <TabsTrigger
+              value="directory"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              Directory
+            </TabsTrigger>
+            <TabsTrigger
+              value="detail"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              User detail
+            </TabsTrigger>
+            <TabsTrigger
+              value="insights"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              Insights
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="directory" className="space-y-6">
+            <CustomerList
+              customers={customers}
+              onSelectCustomer={(id) => {
+                setSelectedCustomerId(id);
+                setActiveTab('detail');
+              }}
+              loading={loading}
+              page={page}
+              total={total}
+              limit={limit}
+              onPageChange={setPage}
+            />
+          </TabsContent>
+
+          <TabsContent value="detail" className="space-y-6">
+            {loadingDetail && selectedCustomerId ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4" />
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Loading user details...</p>
+                </div>
               </div>
-              <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                Total Customers
+            ) : selectedCustomer ? (
+              <CustomerDetail
+                customer={selectedCustomer}
+                onBack={handleBackToList}
+                onUpdateStatus={handleUpdateStatus}
+                onUpdateRole={handleUpdateRole}
+                onUpdateProfile={handleUpdateProfile}
+                onDelete={handleDeleteUser}
+              />
+            ) : (
+              <div className="flex items-center justify-center min-h-[240px]">
+                <p className="text-sm text-neutral-light-text/80 dark:text-neutral-dark-text/80">
+                  Select a user from the directory tab to view full details.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6">
+            <div className="mt-4 pt-4 border-t border-neutral-light-border dark:border-neutral-dark-border">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
+                  <div className="text-2xl font-bold text-neutral-light-heading dark:text-neutral-dark-heading">
+                    {total}
+                  </div>
+                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                    Total Customers
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
+                  <div className="text-2xl font-bold text-brand-green">
+                    {customers.filter((c) => c.kycStatus === KYCStatus.APPROVED).length}
+                  </div>
+                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                    KYC Approved
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
+                  <div className="text-2xl font-bold text-amber-600">
+                    {customers.filter((c) => c.kycStatus === KYCStatus.PENDING).length}
+                  </div>
+                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                    Pending Review
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
+                  <div className="text-2xl font-bold text-red-600">
+                    {customers.filter((c) => c.accountStatus === AccountStatus.BLOCKED).length}
+                  </div>
+                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
+                    Blocked Accounts
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 text-center text-xs text-neutral-light-text dark:text-neutral-dark-text">
+                <p>Compliance Dashboard • Last updated: {new Date().toLocaleDateString()}</p>
+                <p className="mt-1">Showing {customers.length} customers • Auto-refresh every 5 minutes</p>
               </div>
             </div>
-            <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-              <div className="text-2xl font-bold text-brand-green">
-                {customers.filter(c => c.kycStatus === KYCStatus.APPROVED).length}
-              </div>
-              <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                KYC Approved
-              </div>
-            </div>
-            <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-              <div className="text-2xl font-bold text-amber-600">
-                {customers.filter(c => c.kycStatus === KYCStatus.PENDING).length}
-              </div>
-              <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                Pending Review
-              </div>
-            </div>
-            <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-              <div className="text-2xl font-bold text-red-600">
-                {customers.filter(c => c.accountStatus === AccountStatus.BLOCKED).length}
-              </div>
-              <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                Blocked Accounts
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8 text-center text-xs text-neutral-light-text dark:text-neutral-dark-text">
-            <p>Compliance Dashboard • Last updated: {new Date().toLocaleDateString()}</p>
-            <p className="mt-1">Showing {customers.length} customers • Auto-refresh every 5 minutes</p>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

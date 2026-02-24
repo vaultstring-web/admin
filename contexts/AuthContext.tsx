@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Session refresh error (non-critical):', error);
       // Don't clear session on validation errors - keep it active
     }
-  }, []);
+  }, [router]);
 
   // Initialize auth state on mount
   useEffect(() => {
@@ -131,9 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('vs_token')}`
-        }
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();

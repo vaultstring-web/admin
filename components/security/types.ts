@@ -15,7 +15,7 @@ export interface SecurityEvent {
   user_id?: string;
   user_email?: string; // Enriched
   ip_address?: string;
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   status: SecurityStatus;
   created_at: string;
   resolved_at?: string;
@@ -28,6 +28,41 @@ export interface SystemHealthMetric {
   status: 'healthy' | 'warning' | 'critical';
   trend?: 'up' | 'down' | 'stable';
   change?: string;
+}
+
+export interface RiskConfig {
+  enable_circuit_breaker: boolean;
+  max_daily_limit: number;
+  high_value_threshold: number;
+  max_velocity_per_hour: number;
+  max_velocity_per_day: number;
+  suspicious_location_alert: string;
+  global_system_pause: boolean;
+  admin_approval_threshold: number;
+  restricted_countries: string[];
+  enable_dispute_resolution: boolean;
+}
+
+export interface RiskStatus {
+  global_system_pause: boolean;
+  circuit_breaker_open: boolean;
+  failure_count: number;
+  last_failure?: string;
+  threshold: number;
+  reset_duration_seconds: number;
+}
+
+export interface RiskUsageMetrics {
+  daily_volume: string;
+  max_daily_limit: number;
+  daily_usage_ratio: number;
+  max_velocity_per_hour: number;
+  max_velocity_per_day: number;
+  global_system_pause: boolean;
+  circuit_breaker_open: boolean;
+  failure_count: number;
+  threshold: number;
+  cool_off_users: number;
 }
 
 export interface BlocklistEntry {

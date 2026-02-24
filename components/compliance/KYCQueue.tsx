@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Clock, FileStack, ArrowRight, UserCircle2 } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UserCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import {
@@ -26,11 +26,11 @@ interface KYCQueueProps {
   isLoading?: boolean;
 }
 
-export const KYCQueue: React.FC<KYCQueueProps> = ({ 
-  applications, 
-  onReview, 
-  onAssign, 
-  showHistory, 
+export const KYCQueue: React.FC<KYCQueueProps> = ({
+  applications,
+  onReview,
+  onAssign,
+  showHistory,
   onToggleHistory,
   isLoading = false
 }) => {
@@ -149,16 +149,21 @@ export const KYCQueue: React.FC<KYCQueueProps> = ({
                   </div>
                 </TableCell>
                 <TableCell>
-                   {app.assignedTo ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <UserCircle2 className="h-4 w-4 text-muted-foreground" />
-                        {app.assignedTo}
-                      </div>
-                    ) : (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-secondary hover:bg-secondary/10">
-                        Claim Task
-                      </Button>
-                    )}
+                  {app.assignedTo ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <UserCircle2 className="h-4 w-4 text-muted-foreground" />
+                      {app.assignedTo}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-secondary hover:bg-secondary/10"
+                      onClick={() => onAssign(app.id, 'auto-assign')}
+                    >
+                      Claim Task
+                    </Button>
+                  )}
                 </TableCell>
                 <TableCell>{getStatusBadge(app.status)}</TableCell>
                 <TableCell className="text-right pr-md">

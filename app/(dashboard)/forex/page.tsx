@@ -9,8 +9,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowRightLeft, RefreshCw } from "lucide-react"
 import { API_BASE } from "@/lib/constants"
 
+type ApiForexRate = {
+  base_currency?: string;
+  BaseCurrency?: string;
+  target_currency?: string;
+  TargetCurrency?: string;
+  rate?: number | string;
+  Rate?: number | string;
+  buy_rate?: number | string;
+  BuyRate?: number | string;
+  sell_rate?: number | string;
+  SellRate?: number | string;
+  source?: string;
+  Source?: string;
+  valid_from?: string;
+  ValidFrom?: string;
+};
+
+type ConversionResponse = {
+  converted_amount?: number | string;
+  fee_amount?: number | string | null;
+  net_amount?: number | string | null;
+  rate?: number | string;
+  spread_pct?: number | string | null;
+};
+
+type ConversionState = {
+  converted_amount: string;
+  rate: string;
+  fee_amount?: string;
+  net_amount?: string;
+  spread_pct?: string;
+};
+
 export default function ForexPage() {
-  const [rates, setRates] = useState<any[]>([])
+  const [rates, setRates] = useState<ApiForexRate[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [amount, setAmount] = useState<string>("1000")
@@ -35,8 +68,10 @@ export default function ForexPage() {
         const data = await res.json()
         const apiRates = Array.isArray(data.rates) ? data.rates : []
         setRates(apiRates)
-      } catch (err: any) {
-        setError(err?.message || "Failed to load rates")
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load rates";
+        setError(message)
         setRates([])
       } finally {
         setLoading(false)
@@ -53,11 +88,13 @@ export default function ForexPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       })
-      const data = await res.json()
+      const data = (await res.json()) as { rates?: ApiForexRate[] }
       const apiRates = Array.isArray(data.rates) ? data.rates : []
       setRates(apiRates)
-    } catch (err: any) {
-      setError(err?.message || "Failed to refresh rates")
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to refresh rates";
+      setError(message)
       setRates([])
     } finally {
       setLoading(false)
@@ -82,22 +119,50 @@ export default function ForexPage() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || `Conversion failed (${res.status})`)
       }
-      const data = await res.json()
-      const convAmt = typeof data.converted_amount === "number" ? data.converted_amount : parseFloat(String(data.converted_amount || 0))
-      const feeAmtSource = typeof data.fee_amount === "number" ? data.fee_amount : (data.fee_amount != null ? parseFloat(String(data.fee_amount)) : undefined)
-      const rateStr = typeof data.rate === "string" ? data.rate : String(data.rate)
+      const data = (await res.json()) as ConversionResponse
+      const convAmt =
+        typeof data.converted_amount === "number"
+          ? data.converted_amount
+          : parseFloat(String(data.converted_amount || 0))
+      const feeAmtSource =
+        typeof data.fee_amount === "number"
+          ? data.fee_amount
+          : data.fee_amount != null
+          ? parseFloat(String(data.fee_amount))
+          : undefined
+      const rateStr =
+        typeof data.rate === "string" ? data.rate : String(data.rate)
       const rateNum = parseFloat(rateStr)
-      const feeAmtTarget = feeAmtSource != null && !isNaN(rateNum) ? feeAmtSource * rateNum : undefined
-      const netAmtTarget = feeAmtTarget != null ? Math.max(convAmt - feeAmtTarget, 0) : (typeof data.net_amount === "number" ? data.net_amount : (data.net_amount != null ? parseFloat(String(data.net_amount)) : undefined))
-      setConversion({
+      const feeAmtTarget =
+        feeAmtSource != null && !isNaN(rateNum)
+          ? feeAmtSource * rateNum
+          : undefined
+      const netAmtTarget =
+        feeAmtTarget != null
+          ? Math.max(convAmt - feeAmtTarget, 0)
+          : typeof data.net_amount === "number"
+          ? data.net_amount
+          : data.net_amount != null
+          ? parseFloat(String(data.net_amount))
+          : undefined
+      const nextConversion: ConversionState = {
         converted_amount: String(convAmt),
         rate: rateStr,
-        fee_amount: feeAmtTarget != null ? String(feeAmtTarget) : undefined,
-        net_amount: netAmtTarget != null ? String(netAmtTarget) : undefined,
-        spread_pct: data.spread_pct != null ? String(data.spread_pct) : undefined,
-      } as any)
-    } catch (err: any) {
-      setError(err?.message || "Conversion failed")
+      }
+      if (feeAmtTarget != null) {
+        nextConversion.fee_amount = String(feeAmtTarget)
+      }
+      if (netAmtTarget != null) {
+        nextConversion.net_amount = String(netAmtTarget)
+      }
+      if (data.spread_pct != null) {
+        nextConversion.spread_pct = String(data.spread_pct)
+      }
+      setConversion(nextConversion)
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Conversion failed";
+      setError(message)
     } finally {
       setConverting(false)
     }

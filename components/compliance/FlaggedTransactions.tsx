@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, User, Fingerprint, Clock, Search, ShieldAlert, ChevronRight } from 'lucide-react';
+import { AlertCircle, Fingerprint, Clock, ShieldAlert, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FlaggedTransactionsProps {

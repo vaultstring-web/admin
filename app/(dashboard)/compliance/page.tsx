@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, UserCheck, AlertTriangle, ListFilter, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
+import { Shield, UserCheck, AlertTriangle, CheckCircle, XCircle, FileText, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,26 +24,29 @@ import {
   getComplianceReports,
   getTransactions,
   updateKYCApplicationStatus,
-  apiFetch,
   type KYCApplication as ApiKYCApplication,
   type AuditLog as ApiAuditLog,
   type ComplianceReport as ApiComplianceReport,
 } from '@/lib/api';
 import { API_BASE } from '@/lib/constants';
 import { useSession } from '@/hooks/useSession';
-import { 
-  KYCApplication, 
-  KYCStatus, 
-  RiskLevel, 
-  AuditLog, 
-  AuditAction, 
-  ComplianceReport, 
-  ReportType 
+import {
+  KYCApplication,
+  KYCStatus,
+  RiskLevel,
+  AuditLog,
+  AuditAction,
+  ComplianceReport,
+  ReportType,
+  ReportStatus,
 } from '@/components/compliance/types';
+import { safeDate } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function CompliancePage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
-  const [activeTab, setActiveTab] = useState('kyc');
+  const router = useRouter();
+  const [, setActiveTab] = useState('kyc');
   const [showHistory, setShowHistory] = useState(false);
   const [flagged, setFlagged] = useState<ComplianceTx[]>([]);
   const [kycApplications, setKycApplications] = useState<KYCApplication[]>([]);
@@ -69,7 +71,7 @@ export default function CompliancePage() {
     }
   }
 
-  async function handleDecision(status: 'verified' | 'rejected') {
+  async function handleReviewDecision(status: 'verified' | 'rejected') {
     if (!selectedApp) return;
     
     setProcessingDecision(true);
@@ -88,24 +90,29 @@ export default function CompliancePage() {
        setKycApplications(prev => prev.filter(a => a.id !== selectedApp.id));
        toast.success(`Application ${status === 'verified' ? 'approved' : 'rejected'} successfully`);
        setIsReviewOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to process application:', err);
-      toast.error(err.message || 'Failed to process application');
+      const message =
+        err instanceof Error ? err.message : 'Failed to process application';
+      toast.error(message);
     } finally {
       setProcessingDecision(false);
     }
   }
 
   function handleInvestigateTransaction(id: string): void {
-    // Navigate to transaction details or open a modal
-    // For now, we'll just show a toast, but in a real app we'd navigate
     console.log('Investigate transaction:', id);
     toast.info(`Investigation started for TX: ${id}`);
-    
-    // Optimistic update to show it's being investigated
-    setFlagged(prev => prev.map(tx => 
-      tx.id === id ? { ...tx, status: 'investigating' as const } : tx
-    ));
+
+    // Mark as investigating in local state
+    setFlagged(prev =>
+      prev.map(tx =>
+        tx.id === id ? { ...tx, status: 'investigating' as const } : tx
+      )
+    );
+
+    // Deep-link into Transactions page focused on this transaction
+    router.push(`/transactions?tx=${encodeURIComponent(id)}`);
   }
 
   useEffect(() => {
@@ -128,7 +135,7 @@ export default function CompliancePage() {
             status: (app.status as KYCStatus) || KYCStatus.PENDING,
             riskLevel: RiskLevel.LOW, // Default
             riskScore: 25, // Default
-            documents: app.documents?.map((doc: any) => ({
+            documents: app.documents?.map((doc) => ({
               type: doc.document_type || doc.type || 'ID',
               status: doc.verification_status || doc.status || 'pending',
               url: doc.front_image_url || doc.url
@@ -192,7 +199,7 @@ export default function CompliancePage() {
             period: { start: new Date().toISOString(), end: new Date().toISOString() }, // Default
             generatedAt: r.generated_at,
             generatedBy: 'System', // Default
-            status: (r.status as any) || 'generated',
+            status: (r.status as ReportStatus) || 'generated',
             downloadUrl: r.url
           }));
           setComplianceReports(mappedReports);
@@ -203,7 +210,7 @@ export default function CompliancePage() {
         if (txsRes.data?.transactions) {
           const mapped: ComplianceTx[] = txsRes.data.transactions
             .slice(0, 20)
-            .map((t: any) => {
+            .map((t) => {
               const rawAmount =
                 t.amount && typeof t.amount === 'object'
                   ? parseFloat(t.amount.amount || 0)
@@ -246,9 +253,11 @@ export default function CompliancePage() {
             });
           setFlagged(mapped);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch compliance data:', err);
-        setError(err?.message || 'Failed to load compliance data');
+        const message =
+          err instanceof Error ? err.message : 'Failed to load compliance data';
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -472,14 +481,14 @@ export default function CompliancePage() {
               <Button 
                 variant="destructive" 
                 className="flex-1 sm:flex-none gap-2"
-                onClick={() => handleDecision('rejected')}
+                onClick={() => handleReviewDecision('rejected')}
                 disabled={processingDecision}
               >
                 <XCircle size={16} /> Reject
               </Button>
               <Button 
                 className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 gap-2"
-                onClick={() => handleDecision('verified')}
+                onClick={() => handleReviewDecision('verified')}
                 disabled={processingDecision}
               >
                 <CheckCircle size={16} /> Approve

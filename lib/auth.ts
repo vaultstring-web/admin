@@ -74,7 +74,7 @@ export async function validateSession(): Promise<{ valid: boolean; user?: User }
     }
 
     return { valid: true, user };
-  } catch (error) {
+  } catch {
     // On network errors, assume session is still valid (don't clear auth)
     // Return stored user as valid
     const storedUser = getUser();
@@ -97,7 +97,7 @@ export async function logout(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     }).catch(() => {});
-  } catch (error) {}
+  } catch {}
 }
 
 // Check if user is admin

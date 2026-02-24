@@ -1,6 +1,7 @@
-"use client"
+ "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
@@ -49,9 +50,11 @@ export function Sidebar() {
         {/* Logo Section - Clean & Centered */}
         <div className="flex h-20 items-center px-6">
           <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
-            <img 
-              src={theme === "dark" ? "/icons/vs1.svg" : "/icons/vs2.svg"} 
-              alt="Logo" 
+            <Image
+              src={theme === "dark" ? "/icons/vs1.svg" : "/icons/vs2.svg"}
+              alt="Logo"
+              width={100}
+              height={80}
               className="h-20 w-auto md:h-25 lg:h-25"
             />
           </Link>

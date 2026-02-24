@@ -2,12 +2,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Customer, KYCStatus, AccountStatus, AuditLog } from './types';
+import { Customer, KYCStatus, AccountStatus } from './types';
 import { getUserWallets, Wallet } from '@/lib/api';
 import { ArrowLeft, CheckCircle, XCircle, ShieldAlert, ShieldCheck, MapPin, Mail, Phone, Calendar, Clock, FileText, AlertTriangle, User, CreditCard } from 'lucide-react';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { toast } from "sonner";
 
 interface CustomerDetailProps {
   customer: Customer;
@@ -24,7 +25,9 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
   // Modal States
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
   const [updating, setUpdating] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>(customer.role || '');
@@ -61,7 +64,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
 
   const handleRejectKYC = async () => {
     if (!reason.trim()) {
-      alert('Please provide a reason for rejection');
+      toast.error('Please provide a reason for rejection');
       return;
     }
     setUpdating(true);
@@ -78,7 +81,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
 
   const handleBlockAccount = async () => {
     if (!reason.trim()) {
-      alert('Please provide a reason for blocking');
+      toast.error('Please provide a reason for blocking');
       return;
     }
     setUpdating(true);
@@ -122,7 +125,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
   const handleSaveRole = async () => {
     if (!onUpdateRole) return;
     if (!selectedRole) {
-      alert('Please select a role');
+      toast.error('Please select a role');
       return;
     }
     setRoleUpdating(true);
@@ -138,16 +141,27 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
 
   const handleDelete = async () => {
     if (!onDelete) return;
-    const deleteReason = prompt('Please provide a reason for deleting this user account:');
-    if (deleteReason) {
-      setUpdating(true);
-      try {
-        await onDelete(customer.id, deleteReason);
-      } catch (err) {
-        console.error('Failed to delete user:', err);
-      } finally {
-        setUpdating(false);
-      }
+    
+    // Show confirmation modal instead of prompt
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!onDelete) return;
+    if (!deleteReason.trim()) {
+      toast.error('Please provide a reason for deletion');
+      return;
+    }
+    
+    setUpdating(true);
+    try {
+      await onDelete(customer.id, deleteReason);
+      setIsDeleteModalOpen(false);
+      setDeleteReason('');
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -225,10 +239,10 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
               aria-label="User role"
             >
               <option value="">Select role</option>
-              <option value="INDIVIDUAL">Individual</option>
-              <option value="MERCHANT">Merchant</option>
-              <option value="AGENT">Agent</option>
-              <option value="ADMIN">Admin</option>
+              <option value="individual">Individual</option>
+              <option value="merchant">Merchant</option>
+              <option value="agent">Agent</option>
+              <option value="admin">Admin</option>
             </select>
             <Button 
               variant="secondary" 
@@ -467,7 +481,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
                             {log.action.replace(/_/g, ' ')}
                           </p>
                           <p className="text-xs text-neutral-light-text dark:text-neutral-dark-text mt-1">
-                            by {log.adminId} &bull; {log.reason && <span className="italic">"{log.reason}"</span>}
+                            by {log.adminId} &bull; {log.reason && <span className="italic">{log.reason}</span>}
                           </p>
                         </div>
                       </div>
@@ -486,23 +500,31 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
         {/* Sidebar (Right 1/3) */}
         <div className="space-y-6">
           <div className="bg-white dark:bg-neutral-dark-surface border border-neutral-light-border dark:border-neutral-dark-border rounded-lg p-6 shadow-sm">
-            <h3 className="text-sm font-semibold text-neutral-light-heading dark:text-neutral-dark-heading uppercase tracking-wider mb-4">Risk Indicators</h3>
+            <h3 className="text-sm font-semibold text-neutral-light-heading dark:text-neutral-dark-heading uppercase tracking-wider mb-4">Login & Risk Indicators</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-light-text dark:text-neutral-dark-text">PEP Status</span>
-                <span className="font-medium text-green-600 dark:text-green-400">Negative</span>
+                <span className="text-neutral-light-text dark:text-neutral-dark-text">Total Login Attempts</span>
+                <span className="font-medium text-neutral-light-heading dark:text-neutral-dark-heading">
+                  {customer.loginAttempts ?? 0}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-light-text dark:text-neutral-dark-text">Sanctions List</span>
-                <span className="font-medium text-green-600 dark:text-green-400">Clear</span>
+                <span className="text-neutral-light-text dark:text-neutral-dark-text">Failed Login Attempts</span>
+                <span className={`font-medium ${customer.failedLoginAttempts && customer.failedLoginAttempts > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                  {customer.failedLoginAttempts ?? 0}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-light-text dark:text-neutral-dark-text">Adverse Media</span>
-                <span className="font-medium text-yellow-600 dark:text-yellow-400">1 Potential Match</span>
+                <span className="text-neutral-light-text dark:text-neutral-dark-text">Unique Login IPs</span>
+                <span className="font-medium text-neutral-light-heading dark:text-neutral-dark-heading">
+                  {customer.uniqueLoginIPs ?? 0}
+                </span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-neutral-light-text dark:text-neutral-dark-text">IP Consistency</span>
-                <span className="font-medium text-green-600 dark:text-green-400">98% Match</span>
+                <span className="text-neutral-light-text dark:text-neutral-dark-text">Last Login IP</span>
+                <span className="font-medium text-neutral-light-heading dark:text-neutral-dark-heading">
+                  {customer.lastLoginIP || 'N/A'}
+                </span>
               </div>
             </div>
             <div className="mt-6 pt-6 border-t border-neutral-light-border dark:border-neutral-dark-border">
@@ -541,7 +563,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
           </>
         }
       >
-        <p className="mb-4">Please provide a mandatory reason for rejecting this customer's KYC application. This will be logged and visible to the audit team.</p>
+        <p className="mb-4">Please provide a mandatory reason for rejecting this KYC application. This will be logged and visible to the audit team.</p>
         <textarea
           className="w-full border border-neutral-light-border dark:border-neutral-dark-border rounded-md p-2 bg-white dark:bg-neutral-dark-bg text-neutral-light-heading dark:text-neutral-dark-heading focus:ring-2 focus:ring-red-500 focus:outline-none"
           rows={4}
@@ -556,6 +578,7 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
         onClose={() => setIsBlockModalOpen(false)}
         title="Block Customer Account"
         type="danger"
+        backdropBlur={false}
         footer={
           <>
             <Button variant="danger" onClick={handleBlockAccount} disabled={!reason || updating}>
@@ -574,6 +597,55 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setDeleteReason('');
+        }}
+        title="Delete User Account"
+        type="danger"
+        footer={
+          <>
+            <Button 
+              variant="secondary" 
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setDeleteReason('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={handleConfirmDelete} 
+              disabled={!deleteReason.trim() || updating}
+            >
+              {updating ? 'Deleting...' : 'Delete Account'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete this user account? This action cannot be undone and will permanently remove all user data.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason for deletion (required):
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              rows={4}
+              placeholder="Enter reason for deleting this account..."
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

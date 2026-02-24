@@ -31,6 +31,8 @@ interface SecurityEventsTableProps {
   onPageChange?: (page: number) => void
 }
 
+type SeverityVariant = 'destructive' | 'secondary' | 'outline'
+
 export function SecurityEventsTable({ 
   events,
   page = 1,
@@ -38,7 +40,7 @@ export function SecurityEventsTable({
   limit = 10,
   onPageChange
 }: SecurityEventsTableProps) {
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string): SeverityVariant => {
     switch (severity) {
       case 'critical': return 'destructive';
       case 'high': return 'destructive'; // fallback
@@ -101,7 +103,7 @@ export function SecurityEventsTable({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getSeverityColor(event.severity) as any}>
+                      <Badge variant={getSeverityColor(event.severity)}>
                         {event.severity}
                       </Badge>
                     </TableCell>

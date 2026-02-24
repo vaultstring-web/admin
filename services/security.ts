@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api';
-import { SecurityEvent, BlocklistEntry, SystemHealthMetric } from '@/components/security/types';
+import { SecurityEvent, BlocklistEntry, SystemHealthMetric, RiskConfig, RiskStatus, RiskUsageMetrics } from '@/components/security/types';
 
 export const SecurityService = {
   getEvents: async (limit = 10, offset = 0) => {
@@ -32,5 +32,24 @@ export const SecurityService = {
 
   getSystemHealth: async () => {
     return apiFetch<SystemHealthMetric[]>('/admin/security/health');
+  },
+
+  getRiskConfig: async () => {
+    return apiFetch<RiskConfig>('/admin/security/risk/config');
+  },
+
+  getRiskStatus: async () => {
+    return apiFetch<RiskStatus>('/admin/security/risk/status');
+  },
+
+  updateRiskConfig: async (payload: Partial<RiskConfig> & { global_system_pause?: boolean }) => {
+    return apiFetch<RiskStatus>('/admin/security/risk/config', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getRiskUsageMetrics: async () => {
+    return apiFetch<RiskUsageMetrics>('/admin/risk/metrics');
   }
 };

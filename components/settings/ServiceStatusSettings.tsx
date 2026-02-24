@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   AlertTriangle, CheckCircle, XCircle, 
-  CreditCard, Mail, Bell, Activity, RefreshCw, 
+  Activity, RefreshCw, 
   Clock, ShieldAlert, Database, Server, Banknote
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
@@ -19,11 +19,7 @@ export const ServiceStatusSettings = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchStatus();
-  }, []);
-
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     setLoading(true);
     const response = await getSystemStatus();
     if (response.data) {
@@ -36,7 +32,14 @@ export const ServiceStatusSettings = () => {
       });
     }
     setLoading(false);
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      void fetchStatus();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [fetchStatus]);
 
   const getStatusStyles = (status: string) => {
     switch (status) {

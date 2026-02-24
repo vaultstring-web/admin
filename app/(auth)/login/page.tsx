@@ -37,7 +37,6 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
-  const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [verifyingMfa, setVerifyingMfa] = useState(false);
 
@@ -98,8 +97,8 @@ function LoginForm() {
       if (!res.ok) {
         // Handle TOTP requirement
         try {
-          const errorData = await res.json();
-          const err = (errorData as any)?.error;
+          const errorData = (await res.json()) as { error?: string };
+          const err = errorData.error;
           if (res.status === 401 && err === 'totp_required') {
             setMfaRequired(true);
             setInfo('Enter the 6-digit code from your authenticator app');
@@ -135,13 +134,14 @@ function LoginForm() {
 
       // Redirect to dashboard
       router.push('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || 'Login failed. Please try again.');
+      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(message);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: err?.message || 'Login failed. Please try again.'
+        description: message
       });
     } finally {
       setSubmitting(false);
@@ -173,8 +173,8 @@ function LoginForm() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as any)?.error || `Server error: ${res.status} ${res.statusText}`);
+        const err = (await res.json().catch(() => ({} as { error?: string }))) as { error?: string };
+        throw new Error(err.error || `Server error: ${res.status} ${res.statusText}`);
       }
       const data = (await res.json()) as LoginResponse;
       const user = data.user;
@@ -193,13 +193,14 @@ function LoginForm() {
         variant: "default"
       });
       router.push('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err?.message || 'Verification failed. Please try again.');
+      const message = err instanceof Error ? err.message : 'Verification failed. Please try again.';
+      setError(message);
       toast({
         variant: "destructive",
         title: "Verification Failed",
-        description: err?.message || 'Verification failed. Please try again.'
+        description: message
       });
     } finally {
       setVerifyingMfa(false);

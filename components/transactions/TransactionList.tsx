@@ -44,6 +44,7 @@ export function TransactionList(props: TransactionListProps) {
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Summary</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 text-right">Amount</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Status</th>
+              <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Blockchain</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400">Date</th>
               <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-400 text-right">Actions</th>
             </tr>
@@ -101,6 +102,22 @@ export function TransactionList(props: TransactionListProps) {
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={tx.status} />
+                </td>
+                <td className="px-6 py-4">
+                  {tx.blockchainStatus && tx.blockchainStatus !== 'none' && (
+                    <Badge
+                      variant={
+                        tx.blockchainStatus === 'confirmed'
+                          ? 'default'
+                          : tx.blockchainStatus === 'failed'
+                          ? 'destructive'
+                          : 'outline'
+                      }
+                      className="text-[10px] font-black px-2 py-0 h-5"
+                    >
+                      {tx.blockchainStatus.toUpperCase()}
+                    </Badge>
+                  )}
                 </td>
                 <td className="px-6 py-4 text-slate-500 dark:text-slate-400 whitespace-nowrap tabular-nums">
                   <div className="flex items-center gap-2">

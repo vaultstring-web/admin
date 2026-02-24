@@ -12,6 +12,7 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   type?: 'default' | 'danger';
+  backdropBlur?: boolean;
 }
 
 export const Modal = ({ 
@@ -20,7 +21,8 @@ export const Modal = ({
   title, 
   children, 
   footer, 
-  type = 'default' 
+  type = 'default',
+  backdropBlur = true
 }: ModalProps) => {
   // Handle Escape key press
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -56,7 +58,7 @@ export const Modal = ({
         
         {/* Backdrop */}
         <div 
-          className="fixed inset-0 transition-opacity bg-neutral-light-heading/50 dark:bg-black/70 backdrop-blur-sm" 
+          className={`fixed inset-0 transition-opacity bg-neutral-light-heading/50 dark:bg-black/70${backdropBlur ? ' backdrop-blur-sm' : ''}`} 
           aria-hidden="true"
           onClick={onClose}
         />

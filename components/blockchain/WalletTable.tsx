@@ -22,6 +22,7 @@ interface WalletTableProps {
   total?: number;
   limit?: number;
   onPageChange?: (page: number) => void;
+  onWalletClick?: (wallet: WalletAddress) => void;
 }
 
 export const WalletTable: React.FC<WalletTableProps> = ({ 
@@ -29,7 +30,8 @@ export const WalletTable: React.FC<WalletTableProps> = ({
   page = 1,
   total = 0,
   limit = 10,
-  onPageChange
+  onPageChange,
+  onWalletClick
 }) => {
   const totalPages = Math.ceil(total / limit);
 
@@ -68,8 +70,9 @@ export const WalletTable: React.FC<WalletTableProps> = ({
               ) : (
                 wallets.map((wallet) => (
                   <TableRow 
-                    key={wallet.id} 
-                    className="group border-slate-100 dark:border-slate-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-colors"
+                    key={wallet.id}
+                    onClick={() => onWalletClick && onWalletClick(wallet)}
+                    className="group border-slate-100 dark:border-slate-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10 transition-colors cursor-pointer"
                   >
                     <TableCell className="font-mono text-xs font-medium">
                       <div className="flex items-center gap-2">

@@ -39,6 +39,13 @@ export interface Customer {
     submittedAt: string;
   }[];
   auditLogs: AuditLog[];
+  loginAttempts?: number;
+  failedLoginAttempts?: number;
+  lastLoginAt?: string;
+  lastLoginIP?: string;
+  lastFailedLoginAt?: string;
+  lastFailedLoginIP?: string;
+  uniqueLoginIPs?: number;
   address: {
     street: string;
     city: string;

@@ -67,7 +67,7 @@ export const FailedTransactions: React.FC<FailedTransactionsProps> = ({
                 </span>
               </div>
               <p className="text-sm text-muted-foreground italic">
-                "{tx.diagnostic}"
+                {tx.diagnostic}
               </p>
             </div>
 

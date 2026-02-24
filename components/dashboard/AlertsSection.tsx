@@ -2,7 +2,7 @@ import React from 'react';
 import { Card } from './dash-ui/Card';
 import { Bell, AlertCircle, Info, Clock, CheckCircle2, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { DashboardData, Alert } from './types';
+import type { Alert } from './types';
 
 interface AlertsSectionProps {
   alerts: Alert[];

@@ -84,7 +84,10 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
   }, [batches, currency]);
 
   const getStatusConfig = (status: string) => {
-    const configs: Record<string, any> = {
+    const configs: Record<
+      string,
+      { icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; class: string }
+    > = {
       Completed: { icon: CheckCircle2, class: "text-emerald-600 bg-emerald-50 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
       Pending: { icon: Activity, class: "text-amber-600 bg-amber-50 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
       Failed: { icon: AlertCircle, class: "text-rose-600 bg-rose-50 border-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20" },
@@ -117,7 +120,7 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
         </div>
         
         <div className="flex items-center gap-3">
-          <Tabs defaultValue="MWK" onValueChange={(v) => setCurrency(v as any)} className="h-8">
+          <Tabs defaultValue="MWK" onValueChange={(v) => setCurrency(v as 'MWK' | 'CNY' | 'ZMW')} className="h-8">
             <TabsList className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 h-8 p-1">
               <TabsTrigger value="MWK" className="text-[10px] font-bold px-3 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all h-6">MWK</TabsTrigger>
               <TabsTrigger value="CNY" className="text-[10px] font-bold px-3 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all h-6">CNY (元)</TabsTrigger>
@@ -295,7 +298,14 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
   );
 };
 
-function MetricTile({ label, value, subValue, icon: Icon, color }: any) {
+interface MetricTileProps {
+  label: string;
+  value: string;
+  subValue?: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+}
+
+function MetricTile({ label, value, subValue, icon: Icon }: MetricTileProps) {
   return (
     <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between group hover:border-emerald-500/30 transition-all duration-300">
       <div className="space-y-0.5">

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
-  Copy, Key, Eye, EyeOff, Trash2, RefreshCw, 
+  Copy, Key, Trash2, 
   Building, Smartphone, DollarSign, Plus, 
-  ShieldCheck, Zap, MoreHorizontal, Loader2, Check 
+  Zap, MoreHorizontal, Loader2, Check 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,11 +49,7 @@ export const ApiKeysSettings = () => {
     { id: 'read:audit', label: 'Read Audit Logs' },
   ];
 
-  useEffect(() => {
-    fetchKeys();
-  }, []);
-
-  const fetchKeys = async () => {
+  const fetchKeys = useCallback(async () => {
     setLoading(true);
     const response = await getAPIKeys();
     if (response.data) {
@@ -67,7 +63,14 @@ export const ApiKeysSettings = () => {
       });
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      void fetchKeys();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [fetchKeys]);
 
   const handleCreateKey = async () => {
     if (!newKeyName || selectedScopes.length === 0) {
@@ -233,7 +236,7 @@ export const ApiKeysSettings = () => {
                     <Check className="h-5 w-5" /> Key Created
                   </DialogTitle>
                   <DialogDescription>
-                    Please copy your key now. You won't be able to see it again!
+                    Please copy your key now. You will not be able to see it again.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">

@@ -107,9 +107,18 @@ export const TransactionTable: React.FC<TransactionTableProps> = ({
                       <span className="text-xs font-mono">{tx.block_number}</span>
                     </div>
                   </TableCell>
-                   <TableCell className="text-center">
-                    <Badge variant={tx.status === 'VALID' ? 'default' : 'destructive'} className="text-[10px] font-black px-2 py-0 h-5">
-                      {tx.status}
+                  <TableCell className="text-center">
+                    <Badge
+                      variant={
+                        tx.blockchain_status === 'confirmed'
+                          ? 'default'
+                          : tx.blockchain_status === 'failed'
+                          ? 'destructive'
+                          : 'outline'
+                      }
+                      className="text-[10px] font-black px-2 py-0 h-5"
+                    >
+                      {tx.blockchain_status ?? tx.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">

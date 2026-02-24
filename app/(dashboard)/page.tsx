@@ -10,6 +10,16 @@ import { useSession } from "@/hooks/useSession";
 import { getUsers, getForexRates, getSystemStats, getTransactionVolume, getRiskAlerts, getSystemStatus } from "@/lib/api";
 import type { DashboardData, Alert } from "@/components/dashboard/types";
 
+type ForexRate =
+  | { pair?: string; from_currency?: string; to_currency?: string; rate?: number }
+  | { base_currency?: string; target_currency?: string; rate?: number };
+
+type ServiceStatus = {
+  id: string;
+  uptime: number;
+  latency_ms?: number;
+};
+
 export default function DashboardPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -103,20 +113,25 @@ export default function DashboardPage() {
         }
 
         // Process Forex
-        const forexData = forexResponse.data?.rates || [];
-        const mwkRate = forexData.find((r: any) => 
-          (r.pair === "MWK/CNY") || 
-          (r.from_currency === "MWK" && r.to_currency === "CNY") ||
-          (r.from_currency === "CNY" && r.to_currency === "MWK")
-        )?.rate || 0.0085;
+        const forexData = (forexResponse.data?.rates || []) as ForexRate[];
+        const mwkRate =
+          forexData.find((r) =>
+            'pair' in r && r.pair
+              ? r.pair === "MWK/CNY"
+              : (r.from_currency === "MWK" && r.to_currency === "CNY") ||
+                (r.from_currency === "CNY" && r.to_currency === "MWK")
+          )?.rate || 0.0085;
 
         // Process System Status
-        const services = statusResponse.data?.services || [];
+        const services = (statusResponse.data?.services || []) as ServiceStatus[];
         // Calculate averages from real service data
-        const totalUptime = services.reduce((acc: number, curr: any) => acc + curr.uptime, 0);
+        const totalUptime = services.reduce((acc: number, curr) => acc + curr.uptime, 0);
         const avgUptime = services.length > 0 ? totalUptime / services.length : 100;
         
-        const totalLatency = services.reduce((acc: number, curr: any) => acc + (curr.latency_ms || 0), 0);
+        const totalLatency = services.reduce(
+          (acc: number, curr) => acc + (curr.latency_ms || 0),
+          0
+        );
         const avgLatency = services.length > 0 ? totalLatency / services.length : 0;
 
         const dashboardData: DashboardData = {
@@ -165,7 +180,8 @@ export default function DashboardPage() {
             uptime30d: Number(avgUptime.toFixed(2)), // Use average uptime as proxy for 30d history
             avgLatencyMs: Math.round(avgLatency),
             errorRate: (stats.flagged / (stats.total_transactions || 1)) * 100, // Real error/risk rate
-            processingLatencyMs: services.find((s: any) => s.id === 'core-api')?.latency_ms || 0,
+            processingLatencyMs:
+              services.find((s) => s.id === 'core-api')?.latency_ms || 0,
           },
           forex: {
             pair: "MWK/CNY",
@@ -180,9 +196,10 @@ export default function DashboardPage() {
 
         setData(dashboardData);
         setError(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to fetch dashboard data:", err);
-        const errorMsg = err?.message || "Failed to load dashboard data";
+        const errorMsg =
+          err instanceof Error ? err.message : "Failed to load dashboard data";
         setError(errorMsg);
         
         // Check if it's a CORS/gateway error

@@ -14,6 +14,7 @@ export interface Transaction {
   netAmount?: number;
   currency: 'MWK' | 'CNY' | string;
   status: 'Completed' | 'Pending' | 'Failed';
+  blockchainStatus?: 'confirmed' | 'pending' | 'failed' | 'none';
   date: Date;
   flagged: boolean;
   transactionType?: string;

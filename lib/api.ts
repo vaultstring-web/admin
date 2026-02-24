@@ -8,12 +8,6 @@ export interface ApiResponse<T> {
   validation_errors?: Record<string, string>;
 }
 
-// Get authentication token
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('vs_token');
-}
-
 // Get CSRF token from cookie
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null;
@@ -21,21 +15,11 @@ function getCsrfToken(): string | null {
   return match ? match[2] : null;
 }
 
-// Check if we need to redirect to login
-function checkAuthAndRedirect() {
-  const token = getAuthToken();
-  if (!token && typeof window !== 'undefined') {
-    window.location.href = '/login';
-  }
-}
-
 // Base fetch function with auth
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const token = getAuthToken();
-  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -52,10 +36,6 @@ export async function apiFetch<T>(
     } else {
       Object.assign(headers, options.headers);
     }
-  }
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
   }
 
   // CSRF Handling
@@ -97,16 +77,19 @@ export async function apiFetch<T>(
 
     const data = await response.json();
     return { data };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle CORS and network errors more gracefully
-    if (error.message?.includes('CORS') || error.message?.includes('Failed to fetch')) {
+    if (error instanceof Error && (error.message.includes('CORS') || error.message.includes('Failed to fetch'))) {
       return {
         error: 'Cannot connect to API gateway. Please ensure the backend services are running on port 9000.',
       };
     }
-    return {
-      error: error.message || 'Network error occurred',
-    };
+    if (error instanceof Error) {
+      return {
+        error: error.message || 'Network error occurred',
+      };
+    }
+    return { error: 'Network error occurred' };
   }
 }
 
@@ -148,7 +131,7 @@ export interface KYCApplication {
   submitted_at: string;
   status: string;
   risk_score?: number;
-  documents?: any[];
+  documents?: unknown[];
   reviewer_id?: string;
   reviewed_at?: string;
 }
@@ -291,8 +274,8 @@ export interface AuditLog {
   status_code?: number;
   error_message?: string;
   created_at: string;
-  old_values?: any;
-  new_values?: any;
+  old_values?: Record<string, unknown>;
+  new_values?: Record<string, unknown>;
   request_id?: string;
 }
 
@@ -485,6 +468,16 @@ export async function flagTransaction(
   });
 }
 
+export async function getWalletTransactions(
+  walletId: string,
+  limit = 50,
+  offset = 0
+): Promise<ApiResponse<TransactionsResponse>> {
+  return apiFetch<TransactionsResponse>(
+    `/admin/wallets/${walletId}/transactions?limit=${limit}&offset=${offset}`
+  );
+}
+
 // ============================================================================
 // BANKING & PAYMENT GATEWAY API
 // ============================================================================
@@ -562,16 +555,22 @@ export interface BlockchainTransaction {
   timestamp: string;
   channel?: string;
   chaincode?: string;
+  blockchain_tx_hash?: string;
+  blockchain_status?: string;
 }
 
 export interface WalletAddress {
   id: string;
-  address: string;
-  network: string;
+  // Normalized fields used by newer UI components
+  address?: string;
+  network?: string;
   balance?: number;
   currency?: string;
   user_id?: string;
   created_at?: string;
+  // Raw fields coming directly from the backend wallets endpoint
+  wallet_address?: string | null;
+  status?: string;
 }
 
 export type Wallet = WalletAddress;
@@ -726,8 +725,8 @@ export async function getSystemStatus(): Promise<ApiResponse<SystemStatusRespons
   return apiFetch<SystemStatusResponse>('/admin/system/status');
 }
 
-export async function getForexRates(): Promise<ApiResponse<any>> {
-    return apiFetch('/forex/rates');
+export async function getForexRates(): Promise<ApiResponse<unknown>> {
+  return apiFetch<unknown>('/forex/rates');
 }
 
 // ============================================================================

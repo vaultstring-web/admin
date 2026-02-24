@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-
-// no-op middleware for now
-
 export function middleware() {
   return NextResponse.next()
 }

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Bell, Mail, Smartphone, Shield, CreditCard, Cpu, Save, Settings2 } from 'lucide-react';
+import { Mail, Smartphone, Shield, CreditCard, Cpu, Save, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const NotificationPreferences: React.FC = () => {

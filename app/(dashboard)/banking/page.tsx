@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { SummaryHeader } from '@/components/banking/Header';
 import { IntegrationsSection } from '@/components/banking/IntegrationSection';
 import { SettlementActivity } from '@/components/banking/SettlementActivity';
@@ -40,7 +40,7 @@ export default function BankingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchFailedTransactions = async () => {
+  const fetchFailedTransactions = useCallback(async () => {
     try {
       const offset = (failedTxPage - 1) * failedTxLimit;
       const txsRes = await getTransactions(failedTxLimit, offset, { status: 'failed' });
@@ -75,9 +75,9 @@ export default function BankingPage() {
     } catch (err) {
       console.error("Failed to fetch failed transactions", err);
     }
-  };
+  }, [failedTxPage]);
 
-  const fetchSettlements = async () => {
+  const fetchSettlements = useCallback(async () => {
     try {
       const offset = (settlementPage - 1) * settlementLimit;
       const settlementsRes = await getSettlements(settlementLimit, offset);
@@ -99,15 +99,15 @@ export default function BankingPage() {
     } catch (err) {
       console.error("Failed to fetch settlements", err);
     }
-  };
+  }, [settlementPage]);
 
   useEffect(() => {
     fetchFailedTransactions();
-  }, [failedTxPage]);
+  }, [fetchFailedTransactions]);
 
   useEffect(() => {
     fetchSettlements();
-  }, [settlementPage]);
+  }, [fetchSettlements]);
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
@@ -121,7 +121,7 @@ export default function BankingPage() {
       try {
         await Promise.all([
           fetchFailedTransactions(),
-          fetchSettlements()
+          fetchSettlements(),
         ]);
 
         const [accountsRes, gatewaysRes, forexRes] = await Promise.all([
@@ -131,16 +131,23 @@ export default function BankingPage() {
         ]);
 
         const integrationsList: BankIntegration[] = [];
-        
-        if (forexRes.data?.rates && Array.isArray(forexRes.data.rates)) {
-             const rates: Record<string, number> = {};
-             forexRes.data.rates.forEach((r: any) => {
-                 if (r.base_currency && r.target_currency && r.rate) {
-                     const pair = `${r.base_currency}/${r.target_currency}`;
-                     rates[pair] = parseFloat(r.rate);
-                 }
-             });
-             setForexRates(rates);
+
+        type ForexRate = {
+          base_currency?: string;
+          target_currency?: string;
+          rate?: string | number;
+        };
+
+        const forexData = forexRes.data as { rates?: ForexRate[] } | undefined;
+        if (forexData?.rates && Array.isArray(forexData.rates)) {
+          const rates: Record<string, number> = {};
+          forexData.rates.forEach((r) => {
+            if (r.base_currency && r.target_currency && r.rate !== undefined && r.rate !== null) {
+              const pair = `${r.base_currency}/${r.target_currency}`;
+              rates[pair] = typeof r.rate === 'number' ? r.rate : parseFloat(r.rate);
+            }
+          });
+          setForexRates(rates);
         }
         
         if (accountsRes.data?.accounts) {
@@ -179,16 +186,18 @@ export default function BankingPage() {
 
         setIntegrations(integrationsList);
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch banking data:', err);
-        setError(err?.message || 'Failed to load banking data');
+        const message =
+          err instanceof Error ? err.message : 'Failed to load banking data';
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStaticData();
-  }, [sessionLoading, isAuthenticated]);
+  }, [sessionLoading, isAuthenticated, fetchFailedTransactions, fetchSettlements]);
 
   if (sessionLoading || loading) {
     return (

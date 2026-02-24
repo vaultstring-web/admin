@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Building2, FileText, Users, Banknote, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 interface MerchantDetailProps {
   merchant: {
@@ -63,7 +64,7 @@ export default function MerchantDetail({ merchant, onUpdateStatus, onBack }: Mer
   const handleReject = () => {
     const reason = prompt("Enter rejection reason (required)");
     if (!reason) {
-      alert("Rejection reason is required");
+      toast.error("Rejection reason is required");
       return;
     }
     onUpdateStatus(merchant.id, "reject", reason);

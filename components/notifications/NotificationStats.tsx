@@ -2,7 +2,7 @@
 
 import { Notification, NotificationType, NotificationStatus } from './types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, AlertCircle, CheckCircle2, ShieldAlert, Activity, Hash } from 'lucide-react';
+import { Bell, AlertCircle, CheckCircle2, ShieldAlert, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NotificationStatsProps {

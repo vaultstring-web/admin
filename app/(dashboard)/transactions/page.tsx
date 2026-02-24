@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionFilters } from '@/components/transactions/TransactionFilters';
 import { FlagTransactionDialog } from '@/components/transactions/FlagTransactionDialog';
@@ -9,6 +10,7 @@ import { TransactionStats } from '@/components/transactions/TransactionStats';
 import { type Transaction } from '@/components/transactions/types';
 import { getTransactions, flagTransaction, type Transaction as ApiTransaction } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
+import { toast } from "sonner";
 import {
   Pagination,
   PaginationContent,
@@ -17,11 +19,29 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+type MoneyField = number | string | { amount?: number | string; currency?: string };
+
+type ExtendedApiTransaction = ApiTransaction & {
+  amount?: MoneyField;
+  fee?: MoneyField;
+  net_amount?: MoneyField;
+  sender_wallet_number?: string;
+  receiver_wallet_number?: string;
+  sender_user_type?: string;
+  receiver_user_type?: string;
+  timestamp?: string;
+  blockchain_status?: string;
+};
 
 export default function TransactionMonitoringPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get('tx') ?? '';
+
   const [filters, setFilters] = useState({
-    search: '',
+    search: initialSearch,
     status: 'all',
     currency: 'all',
     type: 'all',
@@ -66,7 +86,7 @@ export default function TransactionMonitoringPage() {
         }
 
         const data = response.data;
-        const txs = data?.transactions || [];
+        const txs = (data?.transactions || []) as ExtendedApiTransaction[];
         
         if (data?.total !== undefined) {
           setTotal(data.total);
@@ -74,12 +94,28 @@ export default function TransactionMonitoringPage() {
           setTotal(data.count); 
         }
         
-        const mapped: Transaction[] = txs.map((t: ApiTransaction) => {
-          // Normalize API transaction to UI Transaction
-          const amt = typeof t.amount === 'object' ? (t.amount as any).amount : t.amount;
-          const cur = typeof t.amount === 'object' ? (t.amount as any).currency : t.currency;
-          const feeAmtRaw = t.fee && typeof t.fee === 'object' ? (t.fee as any).amount : t.fee;
-          const netAmtRaw = t.net_amount && typeof t.net_amount === 'object' ? (t.net_amount as any).amount : t.net_amount;
+        const mapped: Transaction[] = txs.map((t) => {
+          const amountField = t.amount;
+          const amt =
+            typeof amountField === 'number' || typeof amountField === 'string'
+              ? amountField
+              : amountField?.amount;
+          const cur =
+            amountField && typeof amountField === 'object'
+              ? amountField.currency
+              : t.currency;
+
+          const feeField = t.fee;
+          const feeAmtRaw =
+            typeof feeField === 'number' || typeof feeField === 'string'
+              ? feeField
+              : feeField?.amount;
+
+          const netField = t.net_amount;
+          const netAmtRaw =
+            typeof netField === 'number' || typeof netField === 'string'
+              ? netField
+              : netField?.amount;
           
           const senderId = String(t.sender_id || '').trim();
           const receiverId = String(t.receiver_id || '').trim();
@@ -90,8 +126,16 @@ export default function TransactionMonitoringPage() {
           const dir: 'sent' | 'received' =
             txType === 'deposit' ? 'received' : 'sent';
           
-          const senderWalletNumber = (t as any).sender_wallet_number || (senderId ? `VS-${senderId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
-          const receiverWalletNumber = (t as any).receiver_wallet_number || (receiverId ? `VS-${receiverId.slice(0, 8)}-${String(cur || '').toUpperCase()}` : undefined);
+          const senderWalletNumber =
+            t.sender_wallet_number ||
+            (senderId
+              ? `VS-${senderId.slice(0, 8)}-${String(cur || '').toUpperCase()}`
+              : undefined);
+          const receiverWalletNumber =
+            t.receiver_wallet_number ||
+            (receiverId
+              ? `VS-${receiverId.slice(0, 8)}-${String(cur || '').toUpperCase()}`
+              : undefined);
           
           const amountNum = parseFloat(String(amt || 0));
           const highThreshold = cur === 'MWK' ? 1000000 : 10000;
@@ -101,12 +145,24 @@ export default function TransactionMonitoringPage() {
             amountNum >= mediumThreshold ? 'Medium' : 'Low';
           const riskScore = riskLevel === 'High' ? 90 : riskLevel === 'Medium' ? 50 : 10;
           
+          const blockchainStatusRaw = t.blockchain_status;
+          let blockchainStatus: 'confirmed' | 'pending' | 'failed' | 'none' | undefined;
+          if (blockchainStatusRaw) {
+            const b = blockchainStatusRaw.toLowerCase();
+            if (b === 'confirmed') blockchainStatus = 'confirmed';
+            else if (b === 'failed') blockchainStatus = 'failed';
+            else if (b === 'pending') blockchainStatus = 'pending';
+            else blockchainStatus = 'none';
+          }
+
           return {
             id: t.id || t.transaction_id || '',
             customer: t.sender_name || t.sender_email || fallbackSender,
             merchant: t.receiver_name || t.receiver_email || fallbackReceiver,
-            senderType: String((t as any).sender_user_type || '').toLowerCase() || undefined,
-            receiverType: String((t as any).receiver_user_type || '').toLowerCase() || undefined,
+            senderType:
+              String(t.sender_user_type || '').toLowerCase() || undefined,
+            receiverType:
+              String(t.receiver_user_type || '').toLowerCase() || undefined,
             senderWalletNumber,
             receiverWalletNumber,
             riskLevel,
@@ -116,7 +172,8 @@ export default function TransactionMonitoringPage() {
             netAmount: netAmtRaw !== undefined ? parseFloat(String(netAmtRaw || 0)) : undefined,
             currency: cur || 'MWK',
             status: mapStatus(t.status),
-            date: new Date(t.created_at || (t as any).timestamp || Date.now()),
+            blockchainStatus,
+            date: new Date(t.created_at || t.timestamp || Date.now()),
             flagged: t.flagged || false,
             transactionType: txType,
             direction: dir,
@@ -125,9 +182,11 @@ export default function TransactionMonitoringPage() {
         });
 
         setTransactions(mapped);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch transactions:', err);
-        setError(err?.message || 'Failed to load transactions');
+        const message =
+          err instanceof Error ? err.message : 'Failed to load transactions';
+        setError(message);
         setTransactions([]);
       } finally {
         setLoading(false);
@@ -178,10 +237,10 @@ export default function TransactionMonitoringPage() {
         setTransactions(prev => prev.map(t => 
           t.id === selectedTx.id ? { ...t, flagged: true } : t
         ));
-        alert(`Transaction ${selectedTx.id} has been flagged.`);
+        toast.success(`Transaction ${selectedTx.id} has been flagged.`);
       } catch (err) {
         console.error('Failed to flag transaction:', err);
-        alert('Failed to flag transaction');
+        toast.error('Failed to flag transaction');
       }
       setFlagOpen(false);
       setFlagReason('');
@@ -225,64 +284,97 @@ export default function TransactionMonitoringPage() {
         </p>
       </div>
 
-      <TransactionStats transactions={filteredTransactions} />
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="inline-flex h-10 items-center justify-center rounded-xl bg-muted/40 p-1.5 border border-border/40">
+          <TabsTrigger
+            value="overview"
+            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger
+            value="filters"
+            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+          >
+            Filters
+          </TabsTrigger>
+          <TabsTrigger
+            value="flagged"
+            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+          >
+            Flagging
+          </TabsTrigger>
+        </TabsList>
 
-      <TransactionFilters
-        search={filters.search}
-        status={filters.status}
-        currency={filters.currency}
-        type={filters.type}
-        onSearchChange={(value) => setFilters({ ...filters, search: value })}
-        onStatusChange={(value) => setFilters({ ...filters, status: value })}
-        onCurrencyChange={(value) => setFilters({ ...filters, currency: value })}
-        onTypeChange={(value) => setFilters({ ...filters, type: value })}
-        onClearFilters={handleClearFilters}
-      />
+        <TabsContent value="overview" className="space-y-6">
+          <TransactionStats transactions={filteredTransactions} />
 
-      <TransactionList
-        transactions={filteredTransactions}
-        onSelectTransaction={handleSelectTransaction}
-        onFlagTransaction={handleFlagTransaction}
-        formatAmount={formatAmount}
-      />
+          <TransactionList
+            transactions={filteredTransactions}
+            onSelectTransaction={handleSelectTransaction}
+            onFlagTransaction={handleFlagTransaction}
+            formatAmount={formatAmount}
+          />
 
-      {/* Pagination Controls */}
-      <div className="mt-4">
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious 
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page > 1) setPage(p => p - 1);
-                }}
-                className={page === 1 ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-            
-            <PaginationItem>
-              <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
-                {page}
-              </PaginationLink>
-            </PaginationItem>
-            
-            <PaginationItem>
-              <PaginationNext 
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (page * limit < total) setPage(p => p + 1);
-                }}
-                className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-        <div className="text-center text-sm text-muted-foreground mt-2">
-          Showing {Math.min(total, (page - 1) * limit + 1)} to {Math.min(total, page * limit)} of {total} results
-        </div>
-      </div>
+          <div className="mt-4">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (page > 1) setPage((p) => p - 1);
+                    }}
+                    className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+
+                <PaginationItem>
+                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (page * limit < total) setPage((p) => p + 1);
+                    }}
+                    className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-center text-sm text-muted-foreground mt-2">
+              Showing {Math.min(total, (page - 1) * limit + 1)} to {Math.min(total, page * limit)} of {total} results
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="filters" className="space-y-6">
+          <TransactionFilters
+            search={filters.search}
+            status={filters.status}
+            currency={filters.currency}
+            type={filters.type}
+            onSearchChange={(value) => setFilters({ ...filters, search: value })}
+            onStatusChange={(value) => setFilters({ ...filters, status: value })}
+            onCurrencyChange={(value) => setFilters({ ...filters, currency: value })}
+            onTypeChange={(value) => setFilters({ ...filters, type: value })}
+            onClearFilters={handleClearFilters}
+          />
+        </TabsContent>
+
+        <TabsContent value="flagged" className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Select a transaction from the overview tab to flag it for compliance review. Use the dialog
+            below to record why the transaction is suspicious.
+          </p>
+        </TabsContent>
+      </Tabs>
 
       <FlagTransactionDialog
         open={flagOpen}

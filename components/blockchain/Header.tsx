@@ -75,7 +75,7 @@ export const BlockchainHeader: React.FC<HeaderProps> = ({
                 </h1>
               </div>
               <p className="text-slate-500 dark:text-slate-400 text-xs font-medium flex items-center gap-1.5">
-                Verification Engine 
+                Verification Engine · {channel}
               </p>
             </div>
           </div>

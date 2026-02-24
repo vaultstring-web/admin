@@ -1,29 +1,56 @@
 // app/(dashboard)/blockchain/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BlockchainHeader, NetworkStatus } from '@/components/blockchain/Header';
 import { BlockchainNetworkList } from '@/components/blockchain/BlockchainNetworkList';
 import { TransactionTable } from '@/components/blockchain/TransactionTable';
 import { WalletTable } from '@/components/blockchain/WalletTable';
 import { SearchSection } from '@/components/blockchain/SearchSection';
-import { VerificationSection } from '@/components/blockchain/VerificationSection';
+import { VerificationSection, VerificationProtocolPanel } from '@/components/blockchain/VerificationSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   getBlockchainNetworks,
   getBlockchainTransactions,
   getWalletAddresses,
+  getWalletTransactions,
   addBlockchainNetwork,
   updateBlockchainNetwork,
   deleteBlockchainNetwork,
   type BlockchainNetwork,
   type BlockchainTransaction,
   type WalletAddress,
+  type Transaction,
 } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
 
+type SearchResult = {
+  txId: string;
+  blockNumber: number;
+  creatorMsp: string;
+  status: string;
+  timestamp: string;
+  chaincode: string;
+  channel: string;
+  payload?: {
+    blockHash: string;
+    dataHash: string;
+    transactionCount: number;
+    channel: string;
+  };
+};
+
+type NetworkFormData = {
+  name: string;
+  type: 'public' | 'testnet' | 'private';
+  rpcUrl: string;
+  chainId: string;
+  symbol: string;
+};
+
 export default function BlockchainPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
-  const [searchResult, setSearchResult] = useState<any>(null);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [searchError, setSearchError] = useState<string>('');
   const [isSearching, setIsSearching] = useState(false);
   const [networks, setNetworks] = useState<BlockchainNetwork[]>([]);
@@ -37,10 +64,16 @@ export default function BlockchainPage() {
   const [walletTotal, setWalletTotal] = useState(0);
   const walletLimit = 10;
 
+  const [selectedWallet, setSelectedWallet] = useState<WalletAddress | null>(null);
+  const [walletTransactions, setWalletTransactions] = useState<Transaction[]>([]);
+  const [walletTxPage, setWalletTxPage] = useState(1);
+  const [walletTxTotal, setWalletTxTotal] = useState(0);
+  const walletTxLimit = 10;
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const offset = (txPage - 1) * txLimit;
       const txsRes = await getBlockchainTransactions(txLimit, offset);
@@ -52,29 +85,54 @@ export default function BlockchainPage() {
     } catch (err) {
       console.error("Failed to fetch blockchain transactions", err);
     }
-  };
+  }, [txPage]);
 
-  const fetchWallets = async () => {
+  const fetchWallets = useCallback(async () => {
     try {
       const offset = (walletPage - 1) * walletLimit;
       const walletsRes = await getWalletAddresses(walletLimit, offset);
       
       if (walletsRes.data?.addresses) {
-        setWallets(walletsRes.data.addresses);
+        const normalized = walletsRes.data.addresses.map((w) => ({
+          ...w,
+          address: w.address ?? w.wallet_address ?? '',
+          network: w.network ?? 'local-ledger',
+        }));
+        setWallets(normalized);
         setWalletTotal(walletsRes.data.total || 0);
       }
     } catch (err) {
       console.error("Failed to fetch wallets", err);
     }
-  };
+  }, [walletPage]);
+
+  const fetchWalletTransactions = useCallback(async () => {
+    if (!selectedWallet) return;
+    try {
+      const offset = (walletTxPage - 1) * walletTxLimit;
+      const res = await getWalletTransactions(selectedWallet.id, walletTxLimit, offset);
+      if (res.data?.transactions) {
+        setWalletTransactions(res.data.transactions);
+        setWalletTxTotal(res.data.total || 0);
+      }
+    } catch (err) {
+      console.error("Failed to fetch wallet transactions", err);
+    }
+  }, [selectedWallet, walletTxPage]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [txPage]);
+  }, [fetchTransactions]);
 
   useEffect(() => {
     fetchWallets();
-  }, [walletPage]);
+  }, [fetchWallets]);
+
+  useEffect(() => {
+    if (selectedWallet) {
+      fetchWalletTransactions();
+    }
+  }, [selectedWallet, fetchWalletTransactions]);
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
@@ -95,18 +153,20 @@ export default function BlockchainPage() {
             }
           })
         ]);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch blockchain data:', err);
-        setError(err?.message || 'Failed to load blockchain data');
+        const message =
+          err instanceof Error ? err.message : 'Failed to load blockchain data';
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchBlockchainData();
-  }, [sessionLoading, isAuthenticated]);
+  }, [sessionLoading, isAuthenticated, fetchTransactions, fetchWallets]);
 
-  const handleAddNetwork = async (network: any) => {
+  const handleAddNetwork = async (network: NetworkFormData) => {
     try {
       const response = await addBlockchainNetwork({
         name: network.name,
@@ -127,7 +187,7 @@ export default function BlockchainPage() {
     }
   };
 
-  const handleUpdateNetwork = async (id: string, network: any) => {
+  const handleUpdateNetwork = async (id: string, network: NetworkFormData) => {
     try {
       const response = await updateBlockchainNetwork(id, {
            name: network.name,
@@ -227,6 +287,8 @@ export default function BlockchainPage() {
     }
   };
 
+  const walletTxTotalPages = Math.ceil(walletTxTotal / walletTxLimit || 1);
+
   // Calculate current height from latest network or transaction
   const currentHeight = networks[0]?.height || transactions[0]?.block_number || 0;
   
@@ -298,41 +360,211 @@ export default function BlockchainPage() {
         lastUpdate={getLastUpdateTime()}
       />
 
-      <BlockchainNetworkList 
-        networks={networks} 
-        onAddNetwork={handleAddNetwork}
-        onUpdateNetwork={handleUpdateNetwork}
-        onDeleteNetwork={handleDeleteNetwork}
-      />
-      
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-2 space-y-8">
-          <SearchSection 
-            onSearch={handleSearch} 
-            isLoading={isSearching}
-            error={searchError}
-            result={searchResult}
-          />
-          <TransactionTable 
-            transactions={transactions} 
-            page={txPage}
-            total={txTotal}
-            limit={txLimit}
-            onPageChange={setTxPage}
-          />
-          <WalletTable 
-            wallets={wallets}
-            page={walletPage}
-            total={walletTotal}
-            limit={walletLimit}
-            onPageChange={setWalletPage}
-          />
+      <Tabs defaultValue="explorer" className="w-full space-y-6">
+        <div className="flex items-center justify-between">
+          <TabsList className="inline-flex h-10 items-center justify-center rounded-xl bg-muted/40 p-1.5 border border-border/40">
+            <TabsTrigger
+              value="explorer"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="integrity"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              Integrity audit
+            </TabsTrigger>
+            <TabsTrigger
+              value="protocol"
+              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
+            >
+              Verification protocol
+            </TabsTrigger>
+          </TabsList>
         </div>
-        
-        <div className="space-y-8">
-          <VerificationSection />
-        </div>
-      </div>
+
+        <TabsContent value="explorer" className="space-y-8">
+          <BlockchainNetworkList
+            networks={networks}
+            onAddNetwork={handleAddNetwork}
+            onUpdateNetwork={handleUpdateNetwork}
+            onDeleteNetwork={handleDeleteNetwork}
+          />
+
+          <div className="space-y-8">
+            <SearchSection
+              onSearch={handleSearch}
+              isLoading={isSearching}
+              error={searchError}
+              result={searchResult}
+            />
+            <TransactionTable
+              transactions={transactions}
+              page={txPage}
+              total={txTotal}
+              limit={txLimit}
+              onPageChange={setTxPage}
+            />
+            <WalletTable
+              wallets={wallets}
+              page={walletPage}
+              total={walletTotal}
+              limit={walletLimit}
+              onPageChange={setWalletPage}
+              onWalletClick={(wallet) => {
+                setSelectedWallet(wallet);
+                setWalletTxPage(1);
+              }}
+            />
+
+            {selectedWallet && (
+              <div className="mt-6">
+                <h2 className="text-sm font-semibold text-slate-600 mb-2">
+                  Wallet Activity –{' '}
+                  {selectedWallet.address ||
+                    selectedWallet.wallet_address ||
+                    selectedWallet.id}
+                </h2>
+                <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-900">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">
+                          Time
+                        </th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">
+                          Direction
+                        </th>
+                        <th className="px-3 py-2 text-right text-[10px] font-black uppercase tracking-wider">
+                          Amount
+                        </th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">
+                          Reference
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {walletTransactions.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="px-3 py-4 text-center text-xs text-slate-500"
+                          >
+                            No transactions for this wallet
+                          </td>
+                        </tr>
+                      ) : (
+                        walletTransactions.map((tx) => {
+                          const created = tx.created_at
+                            ? new Date(tx.created_at)
+                            : null;
+                          const amount =
+                            typeof tx.amount === 'object' && tx.amount !== null
+                              ? (tx.amount as { amount?: string | number }).amount ?? ''
+                              : tx.amount;
+                          const currency =
+                            typeof tx.amount === 'object' && tx.amount !== null
+                              ? (tx.amount as { currency?: string }).currency ??
+                                tx.currency
+                              : tx.currency;
+                          return (
+                            <tr
+                              key={tx.id}
+                              className="border-t border-slate-100 dark:border-slate-800"
+                            >
+                              <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                                {created ? created.toLocaleString() : '-'}
+                              </td>
+                              <td className="px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                                {tx.transaction_type || 'payment'}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-slate-600">
+                                {tx.sender_id === (selectedWallet.user_id || '')
+                                  ? 'Debit'
+                                  : 'Credit'}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-right font-mono text-slate-800 dark:text-slate-100">
+                                {amount} {currency}
+                              </td>
+                              <td className="px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                {tx.status}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-slate-600">
+                                {tx.reference || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                  {walletTxTotal > walletTxLimit && (
+                    <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500">
+                      <span>
+                        Showing{' '}
+                        {Math.min(walletTxLimit, walletTransactions.length)} of{' '}
+                        {walletTxTotal} transactions
+                      </span>
+                      <div className="space-x-2">
+                        <button
+                          disabled={walletTxPage <= 1}
+                          className={`px-2 py-1 rounded border text-xs ${
+                            walletTxPage <= 1
+                              ? 'opacity-40 cursor-default border-slate-200'
+                              : 'border-slate-300 hover:bg-slate-50'
+                          }`}
+                          onClick={() =>
+                            walletTxPage > 1 &&
+                            setWalletTxPage(walletTxPage - 1)
+                          }
+                        >
+                          Prev
+                        </button>
+                        <span className="font-mono">
+                          {walletTxPage}/{walletTxTotalPages || 1}
+                        </span>
+                        <button
+                          disabled={walletTxPage >= walletTxTotalPages}
+                          className={`px-2 py-1 rounded border text-xs ${
+                            walletTxPage >= walletTxTotalPages
+                              ? 'opacity-40 cursor-default border-slate-200'
+                              : 'border-slate-300 hover:bg-slate-50'
+                          }`}
+                          onClick={() =>
+                            walletTxPage < walletTxTotalPages &&
+                            setWalletTxPage(walletTxPage + 1)
+                          }
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="integrity" className="space-y-8">
+          <div className="max-w-5xl">
+            <VerificationSection />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="protocol" className="space-y-8">
+          <div className="max-w-3xl">
+            <VerificationProtocolPanel />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

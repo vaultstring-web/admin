@@ -25,7 +25,7 @@ export async function getAPIKeys(): Promise<ApiResponse<APIKey[]>> {
 export async function createAPIKey(name: string, scopes: string[], expiryDays: number = 365): Promise<ApiResponse<CreateAPIKeyResponse>> {
   return apiFetch<CreateAPIKeyResponse>('/admin/api-keys', {
     method: 'POST',
-    body: JSON.stringify({ name, scopes }),
+    body: JSON.stringify({ name, scopes, expiry_days: expiryDays }),
   });
 }
 

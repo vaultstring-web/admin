@@ -1,7 +1,7 @@
 'use client';
 
 import { AnalyticsDashboard } from '@/components/reports/AnalyticsDashboard';
-import { Shield, LineChart, RefreshCw, FileDown, Clock, Database, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Shield, RefreshCw, FileDown, Clock, Database, CheckCircle2, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,11 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import {
   getSystemMetrics,
   getEarningsReport,
-  getAuditLogs,
-  getTransactionVolume,
   type SystemMetrics,
   type EarningsReport,
-  type TransactionVolume,
 } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
 
@@ -23,7 +20,6 @@ export default function ReportsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [earnings, setEarnings] = useState<EarningsReport[]>([]);
-  const [volumeData, setVolumeData] = useState<TransactionVolume[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +32,9 @@ export default function ReportsPage() {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      const [metricsRes, earningsRes, volumeRes] = await Promise.all([
+      const [metricsRes, earningsRes] = await Promise.all([
         getSystemMetrics(),
         getEarningsReport(startDate, endDate),
-        getTransactionVolume(6), // Get last 6 months
       ]);
 
       if (metricsRes.data) {
@@ -50,12 +45,12 @@ export default function ReportsPage() {
         setEarnings(earningsRes.data.reports);
       }
 
-      if (volumeRes.data) {
-        setVolumeData(volumeRes.data);
-      }
-    } catch (err: any) {
+      
+    } catch (err: unknown) {
       console.error('Failed to fetch reports data:', err);
-      setError(err?.message || 'Failed to load reports data');
+      const message =
+        err instanceof Error ? err.message : 'Failed to load reports data';
+      setError(message);
     } finally {
       setIsRefreshing(false);
       setLoading(false);

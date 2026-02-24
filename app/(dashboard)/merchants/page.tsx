@@ -10,15 +10,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { API_BASE } from "@/lib/constants";
+import { toast } from "sonner";
 import { updateUserStatus, updateKYCStatus } from "@/lib/api";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+
+type MerchantUser = {
+  id: string;
+  business_name?: string;
+  first_name?: string;
+  last_name?: string;
+  created_at?: string;
+  kyc_status?: string;
+  is_active?: boolean;
+  email?: string;
+  phone?: string;
+  risk_score?: string | number;
+  country_code?: string;
+  business_registration?: string;
+};
 
 export default function MerchantsPage() {
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
@@ -39,7 +47,6 @@ export default function MerchantsPage() {
     primaryCurrency: string;
   }>>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<{
     id: string;
     businessName: string;
@@ -72,15 +79,19 @@ export default function MerchantsPage() {
       return "pending";
     };
     const mapAccount = (isActive?: boolean) => (isActive ? "active" : "suspended");
-    const mapRisk = (r: any) =>
-      typeof r === "string"
-        ? Math.min(100, Math.max(0, parseFloat(r)))
-        : typeof r === "number"
-        ? Math.min(100, Math.max(0, r))
-        : 0;
+    const mapRisk = (r?: string | number | null) => {
+      if (typeof r === "string") {
+        const parsed = parseFloat(r);
+        if (Number.isNaN(parsed)) return 0;
+        return Math.min(100, Math.max(0, parsed));
+      }
+      if (typeof r === "number") {
+        return Math.min(100, Math.max(0, r));
+      }
+      return 0;
+    };
     const fetchMerchants = async () => {
       setLoading(true);
-      setError(null);
       try {
         const offset = (page - 1) * limit;
         const res = await fetch(`${API_BASE}/admin/users?limit=${limit}&offset=${offset}&type=merchant`, {
@@ -88,14 +99,14 @@ export default function MerchantsPage() {
           credentials: 'include',
         });
         if (!res.ok) {
-          const data = await res.json().catch(() => ({} as any));
+          const data = (await res.json().catch(() => ({} as { error?: string }))) as { error?: string };
           throw new Error(data.error || `Fetch failed (${res.status})`);
         }
-        const data = await res.json();
+        const data = (await res.json()) as { users?: MerchantUser[]; total?: number };
         const users = Array.isArray(data.users) ? data.users : [];
         setTotal(data.total || 0);
         // Backend now filters by type=merchant, so we use all returned users
-        const mapped = users.map((u: any) => ({
+        const mapped = users.map((u) => ({
           id: u.id,
           businessName: u.business_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Merchant",
           registrationDate: (u.created_at || "").toString().slice(0, 10),
@@ -109,9 +120,8 @@ export default function MerchantsPage() {
           primaryCurrency: String(u.country_code || '').toUpperCase() === 'CN' ? 'CNY' : 'MWK',
         }));
         setSimpleMerchants(mapped);
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Failed to fetch merchants:', e);
-        setError(e.message || "Failed to load merchants");
         setSimpleMerchants([]);
       } finally {
         setLoading(false);
@@ -127,7 +137,7 @@ export default function MerchantsPage() {
     const suspendedAccounts = simpleMerchants.filter(m => m.accountStatus === "suspended").length;
     const totalVolume = 0;
     return { totalMerchants, pendingVerification, totalVolume, suspendedAccounts };
-  }, [simpleMerchants]);
+  }, [simpleMerchants, total]);
 
   // Handle back from detail view
   const handleBackToList = () => {
@@ -217,7 +227,7 @@ export default function MerchantsPage() {
       }
     } catch (error) {
       console.error("Failed to update status:", error);
-      alert("Failed to update status");
+      toast.error("Failed to update status");
     }
   };
 

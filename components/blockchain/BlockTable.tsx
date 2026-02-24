@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Clock, ExternalLink, Box, Database, ArrowRight } from 'lucide-react';
+import { Clock, Box, Database, ArrowRight } from 'lucide-react';
 import {
   Pagination,
   PaginationContent,
@@ -15,7 +15,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { cn } from '@/lib/utils';
 
 interface BlockTableProps {
   blocks: Block[];
