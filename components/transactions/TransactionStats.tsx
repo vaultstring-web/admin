@@ -22,7 +22,7 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
       <StatCard 
         label="Total Volume" 
         value={stats.total} 
@@ -48,14 +48,13 @@ export function TransactionStats({ transactions }: TransactionStatsProps) {
         icon={Clock}
         color="amber"
       />
-      {/* Special Revenue Card: Spans 2 columns */}
       <StatCard 
         label="Total Revenue" 
         value={stats.totalAmount} 
         icon={Banknote}
         color="violet"
         isCurrency
-        className="lg:col-span-2 shadow-md shadow-violet-500/5 ring-violet-500/20 dark:ring-violet-500/30"
+        className="shadow-md shadow-violet-500/5 ring-violet-500/20 dark:ring-violet-500/30"
       />
       <StatCard 
         label="Fees Earned" 

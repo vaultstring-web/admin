@@ -40,6 +40,7 @@ export const NAV_GROUPS = {
     items: [
       { title: "Customers", href: ROUTES.USERS, icon: "Users" },
       { title: "Merchants", href: ROUTES.MERCHANTS, icon: "Store" },
+      { title: "Active Wallets", href: ROUTES.WALLETS, icon: "Wallet" },
     ],
   },
   finance: {
@@ -48,21 +49,12 @@ export const NAV_GROUPS = {
       { title: "Transactions", href: ROUTES.TRANSACTIONS, icon: "ArrowLeftRight" },
       { title: "Forex Rates", href: ROUTES.FOREX, icon: "DollarSign" },
       { title: "Banking", href: ROUTES.BANKING, icon: "Building2" },
-    ],
-  },
-  systemTools: {
-    title: "System & Tools",
-    items: [
       { title: "Blockchain", href: ROUTES.BLOCKCHAIN, icon: "Box" },
-      { title: "Active Wallets", href: ROUTES.WALLETS, icon: "Wallet" },
-      { title: "Notifications", href: ROUTES.NOTIFICATIONS, icon: "Bell" },
-      { title: "Settings", href: ROUTES.SETTINGS, icon: "Settings" },
     ],
   },
-  complianceReports: {
-    title: "Compliance & Reports",
+  reporting: {
+    title: "Reporting",
     items: [
-      { title: "Compliance", href: ROUTES.COMPLIANCE, icon: "ShieldCheck" },
       { title: "Reports", href: ROUTES.REPORTS, icon: "BarChart3" },
     ],
   },

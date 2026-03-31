@@ -20,14 +20,15 @@ export function DetailDrawer({
   children,
   widthClassName,
 }: DetailDrawerProps) {
+  const width = widthClassName ?? 'w-full sm:w-[760px]';
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className={widthClassName ?? 'sm:max-w-xl'}>
+      <SheetContent side="right" className={width}>
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           {description && <SheetDescription>{description}</SheetDescription>}
         </SheetHeader>
-        <div className="px-4 pb-6 overflow-y-auto">{children}</div>
+        <div className="px-4 pb-6 overflow-y-auto overflow-x-hidden">{children}</div>
       </SheetContent>
     </Sheet>
   );

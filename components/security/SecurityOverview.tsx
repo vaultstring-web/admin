@@ -9,6 +9,24 @@ interface SecurityOverviewProps {
 }
 
 export function SecurityOverview({ metrics }: SecurityOverviewProps) {
+  if (!metrics || metrics.length === 0) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {['API Latency', 'Active Threats', 'Failed Logins (1h)', 'System Status'].map((label) => (
+          <Card key={label}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">--</div>
+              <p className="text-xs text-muted-foreground">No telemetry available yet</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   const getIcon = (metric: string) => {
     switch (metric) {
       case 'API Latency': return Activity;

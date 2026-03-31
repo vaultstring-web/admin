@@ -24,7 +24,7 @@ interface TransactionListProps {
 }
 
 export function TransactionList(props: TransactionListProps) {
-  const { transactions, onFlagTransaction, formatAmount } = props;
+  const { transactions, onSelectTransaction, onFlagTransaction, formatAmount } = props;
   const [page, setPage] = useState(1);
   const limit = 10;
   const total = transactions.length;
@@ -53,7 +53,8 @@ export function TransactionList(props: TransactionListProps) {
             {paginatedTransactions.map((tx) => (
               <tr 
                 key={tx.id} 
-                className="group hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all duration-200"
+                className="group hover:bg-slate-50/80 dark:hover:bg-slate-900/80 transition-all duration-200 cursor-pointer"
+                onClick={() => onSelectTransaction(tx)}
               >
                 <td className="px-6 py-4 font-mono text-xs text-slate-400">
                   <div className="flex items-center gap-2">
@@ -136,8 +137,22 @@ export function TransactionList(props: TransactionListProps) {
                     <Button 
                       size="sm" 
                       variant="outline" 
+                      className="h-8 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTransaction(tx);
+                      }}
+                    >
+                      View
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
                       className="h-8 w-8 p-0"
-                      onClick={() => onFlagTransaction(tx)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onFlagTransaction(tx);
+                      }}
                     >
                       <AlertCircle size={14} />
                     </Button>
@@ -145,6 +160,13 @@ export function TransactionList(props: TransactionListProps) {
                 </td>
               </tr>
             ))}
+            {paginatedTransactions.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+                  No transactions match the current filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

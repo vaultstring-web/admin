@@ -386,7 +386,7 @@ export default function SecurityPage() {
     >
       <SecurityOverview metrics={health} />
 
-      {riskUsageMetrics && (
+      {riskUsageMetrics ? (
         <Card>
           <CardHeader>
             <CardTitle>Risk Usage</CardTitle>
@@ -407,9 +407,18 @@ export default function SecurityPage() {
             </div>
           </CardContent>
         </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Risk Usage</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            No risk metrics yet. Activity will appear here after transactions and risk events are processed.
+          </CardContent>
+        </Card>
       )}
 
-      {localRiskConfig && (
+      {localRiskConfig ? (
         <Card>
           <CardHeader>
             <CardTitle>Risk Configuration</CardTitle>
@@ -551,6 +560,15 @@ export default function SecurityPage() {
                 Save Risk Settings
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Risk Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Risk configuration is unavailable right now. Verify backend risk endpoints are reachable.
           </CardContent>
         </Card>
       )}

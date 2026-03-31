@@ -604,7 +604,7 @@ export default function UsersPage() {
         }}
         title={overview?.user?.email || 'User overview'}
         description="User 360: wallets, recent transactions, audit & security timeline."
-        widthClassName="sm:max-w-3xl"
+        widthClassName="w-full sm:w-[900px]"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
