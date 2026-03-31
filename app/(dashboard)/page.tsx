@@ -1,14 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KpiSummary } from "@/components/dashboard/KpiSummary";
-import { SystemHealth } from "@/components/dashboard/SystemHealth";
-import { ForexStatus } from "@/components/dashboard/ForexStatus";
-import { AlertsSection } from "@/components/dashboard/AlertsSection";
-import { TransactionVolumeChart } from "@/components/reports/TransactionVolumeChart";
+import dynamic from 'next/dynamic';
 import { useSession } from "@/hooks/useSession";
 import { getUsers, getForexRates, getSystemStats, getTransactionVolume, getRiskAlerts, getSystemStatus } from "@/lib/api";
 import type { DashboardData, Alert } from "@/components/dashboard/types";
+
+// Lazy load dashboard components
+const KpiSummary = dynamic(() => import("@/components/dashboard/KpiSummary").then(mod => mod.KpiSummary), {
+  ssr: false,
+  loading: () => <div className="h-[120px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const SystemHealth = dynamic(() => import("@/components/dashboard/SystemHealth").then(mod => mod.SystemHealth), {
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const ForexStatus = dynamic(() => import("@/components/dashboard/ForexStatus").then(mod => mod.ForexStatus), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const AlertsSection = dynamic(() => import("@/components/dashboard/AlertsSection").then(mod => mod.AlertsSection), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const TransactionVolumeChart = dynamic(() => import("@/components/reports/TransactionVolumeChart").then(mod => mod.TransactionVolumeChart), {
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
 
 type ForexRate =
   | { pair?: string; from_currency?: string; to_currency?: string; rate?: number }

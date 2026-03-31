@@ -9,9 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, TrendingUp, DollarSign, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { API_BASE } from "@/lib/constants";
 import { toast } from "sonner";
-import { updateUserStatus, updateKYCStatus } from "@/lib/api";
+import { getUserById, getUsers, updateUserStatus, updateKYCStatus } from "@/lib/api";
 
 type MerchantUser = {
   id: string;
@@ -94,18 +93,9 @@ export default function MerchantsPage() {
       setLoading(true);
       try {
         const offset = (page - 1) * limit;
-        const res = await fetch(`${API_BASE}/admin/users?limit=${limit}&offset=${offset}&type=merchant`, {
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        });
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({} as { error?: string }))) as { error?: string };
-          throw new Error(data.error || `Fetch failed (${res.status})`);
-        }
-        const data = (await res.json()) as { users?: MerchantUser[]; total?: number };
-        const users = Array.isArray(data.users) ? data.users : [];
-        setTotal(data.total || 0);
-        // Backend now filters by type=merchant, so we use all returned users
+        const data = await getUsers(limit, offset, { userType: "merchant" });
+        const users = Array.isArray(data.data?.users) ? (data.data?.users as MerchantUser[]) : [];
+        setTotal(data.data?.total || 0);
         const mapped = users.map((u) => ({
           id: u.id,
           businessName: u.business_name || `${u.first_name || ""} ${u.last_name || ""}`.trim() || "Merchant",
@@ -135,7 +125,8 @@ export default function MerchantsPage() {
     const totalMerchants = total;
     const pendingVerification = simpleMerchants.filter(m => m.verificationStatus === "pending").length;
     const suspendedAccounts = simpleMerchants.filter(m => m.accountStatus === "suspended").length;
-    const totalVolume = 0;
+    // Real transaction volume will be fetched from backend statistics
+    const totalVolume = 0; // Will be populated from backend stats
     return { totalMerchants, pendingVerification, totalVolume, suspendedAccounts };
   }, [simpleMerchants, total]);
 
@@ -173,36 +164,32 @@ export default function MerchantsPage() {
       // @ts-expect-error optional field handled in component
       primaryCurrency: sel?.primaryCurrency
     });
-    fetch(`${API_BASE}/admin/users/${id}`, {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(u => {
-        if (!u) return;
-        setSelectedDetail(prev => ({
-          id: u.id || prev?.id || id,
-          businessName: u.business_name || prev?.businessName || "Merchant",
-          legalType: "Private Limited Company",
-          registrationNumber: u.business_registration || "",
-          taxId: "",
-          address: "",
-          contact: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
-          phone: u.phone || "",
-          email: u.email || "",
-          category: prev?.category || "E-commerce",
-          registrationDate: (u.created_at || "").toString().slice(0, 10),
-          verificationStatus: ((u.kyc_status || "").toLowerCase() === "verified" ? "approved" : (u.kyc_status || "").toLowerCase() === "rejected" ? "rejected" : "pending"),
-          accountStatus: u.is_active ? "active" : "suspended",
-          riskScore: prev?.riskScore ?? 0,
-          transactionVolume: 0,
-          settlementBalance: 0,
-          documents: [],
-          owners: [],
-          bankAccounts: [],
-        }));
-      })
-      .catch(() => {});
+    void (async () => {
+      const res = await getUserById(id);
+      if (!res.data) return;
+      const u = res.data as unknown as MerchantUser;
+      setSelectedDetail((prev) => ({
+        id: u.id || prev?.id || id,
+        businessName: u.business_name || prev?.businessName || "Merchant",
+        legalType: "Private Limited Company",
+        registrationNumber: u.business_registration || "",
+        taxId: "",
+        address: "",
+        contact: `${u.first_name || ""} ${u.last_name || ""}`.trim(),
+        phone: u.phone || "",
+        email: u.email || "",
+        category: prev?.category || "E-commerce",
+        registrationDate: (u.created_at || "").toString().slice(0, 10),
+        verificationStatus: ((u.kyc_status || "").toLowerCase() === "verified" ? "approved" : (u.kyc_status || "").toLowerCase() === "rejected" ? "rejected" : "pending"),
+        accountStatus: u.is_active ? "active" : "suspended",
+        riskScore: prev?.riskScore ?? 0,
+        transactionVolume: 0,
+        settlementBalance: 0,
+        documents: [],
+        owners: [],
+        bankAccounts: [],
+      }));
+    })();
   };
 
   // Handle status updates

@@ -80,13 +80,10 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
   };
 
   const handleBlockAccount = async () => {
-    if (!reason.trim()) {
-      toast.error('Please provide a reason for blocking');
-      return;
-    }
+    const finalReason = reason.trim() || 'Blocked by admin from VaultString Dashboard';
     setUpdating(true);
     try {
-      await onUpdateStatus(customer.id, AccountStatus.BLOCKED, reason);
+      await onUpdateStatus(customer.id, AccountStatus.BLOCKED, finalReason);
       setIsBlockModalOpen(false);
       setReason('');
     } catch (err) {
@@ -148,14 +145,11 @@ export const CustomerDetail = ({ customer, onBack, onUpdateStatus, onUpdateRole,
 
   const handleConfirmDelete = async () => {
     if (!onDelete) return;
-    if (!deleteReason.trim()) {
-      toast.error('Please provide a reason for deletion');
-      return;
-    }
+    const finalReason = deleteReason.trim() || 'Deleted by admin from VaultString Dashboard';
     
     setUpdating(true);
     try {
-      await onDelete(customer.id, deleteReason);
+      await onDelete(customer.id, finalReason);
       setIsDeleteModalOpen(false);
       setDeleteReason('');
     } catch (err) {

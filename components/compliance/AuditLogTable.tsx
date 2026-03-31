@@ -29,8 +29,8 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  const getActionBadge = (action: AuditAction) => {
-    // Using semantic brand colors instead of generic Tailwind colors
+  const getActionBadge = (action: string) => {
+    // Using semantic brand colors for audit actions
     const styles: Record<string, string> = {
       [AuditAction.CREATE]: 'bg-primary/10 text-primary border-primary/20',
       [AuditAction.UPDATE]: 'bg-semantic-warning-light/10 text-semantic-warning-light border-semantic-warning-light/20',
@@ -40,11 +40,14 @@ export const AuditLogTable: React.FC<AuditLogTableProps> = ({ logs, onExport }) 
       [AuditAction.LOGIN_SUCCESS]: 'bg-green-100 text-green-700 border-green-200',
       [AuditAction.LOGIN_FAILED]: 'bg-red-100 text-red-700 border-red-200',
       [AuditAction.LOGIN]: 'bg-blue-100 text-blue-700 border-blue-200',
+      USER_BLOCKED: 'bg-red-100 text-red-700 border-red-200',
+      USER_UNBLOCKED: 'bg-green-100 text-green-700 border-green-200',
+      USER_SOFT_DELETED: 'bg-amber-100 text-amber-700 border-amber-200',
     };
 
     return (
       <Badge variant="outline" className={`text-[10px] uppercase tracking-wider font-bold ${styles[action] || 'bg-muted/50 text-muted-foreground'}`}>
-        {action.replace('_', ' ')}
+        {String(action).replace(/_/g, ' ')}
       </Badge>
     );
   };

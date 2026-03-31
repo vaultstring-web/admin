@@ -13,6 +13,8 @@ import {
   getBankAccounts,
   getPaymentGateways,
   getSettlements,
+  retrySettlement,
+  reconcileSettlement,
   getTransactions,
   getForexRates,
   type BankAccount,
@@ -100,6 +102,24 @@ export default function BankingPage() {
       console.error("Failed to fetch settlements", err);
     }
   }, [settlementPage]);
+
+  const retryBatch = useCallback(async (id: string) => {
+    try {
+      await retrySettlement(id);
+      await fetchSettlements();
+    } catch (err) {
+      console.error("Failed to retry settlement", err);
+    }
+  }, [fetchSettlements]);
+
+  const reconcileBatch = useCallback(async (id: string) => {
+    try {
+      await reconcileSettlement(id);
+      await fetchSettlements();
+    } catch (err) {
+      console.error("Failed to reconcile settlement", err);
+    }
+  }, [fetchSettlements]);
 
   useEffect(() => {
     fetchFailedTransactions();
@@ -257,6 +277,8 @@ export default function BankingPage() {
             limit={settlementLimit}
             onPageChange={setSettlementPage}
             rates={forexRates}
+            onRetryBatch={retryBatch}
+            onReconcileBatch={reconcileBatch}
           />
         </div>
         

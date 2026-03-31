@@ -13,6 +13,7 @@ import {
   type EarningsReport,
 } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
+import { downloadCsv } from '@/lib/csv';
 
 export default function ReportsPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -67,6 +68,27 @@ export default function ReportsPage() {
 
   const handleRefresh = () => {
     fetchData();
+  };
+
+  const handleExport = () => {
+    const rows = earnings.map((r) => ({
+      period: r.period,
+      currency: r.currency,
+      total_earnings: r.total_earnings,
+      transaction_count: r.transaction_count,
+      avg_earnings_per_tx: r.average_earnings_per_transaction,
+    }));
+    downloadCsv(
+      rows,
+      [
+        { key: 'period', header: 'Period' },
+        { key: 'currency', header: 'Currency' },
+        { key: 'total_earnings', header: 'Total earnings' },
+        { key: 'transaction_count', header: 'Transaction count' },
+        { key: 'avg_earnings_per_tx', header: 'Avg earnings/tx' },
+      ],
+      `earnings-report-${new Date().toISOString().slice(0, 10)}.csv`
+    );
   };
 
   const earningsTotal = earnings.reduce((sum, r) => sum + (r?.total_earnings || 0), 0);
@@ -126,7 +148,11 @@ export default function ReportsPage() {
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Syncing...' : 'Sync'}
             </Button>
-            <Button className="rounded-xl h-10 px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold gap-2 text-xs">
+            <Button
+              onClick={handleExport}
+              disabled={earnings.length === 0}
+              className="rounded-xl h-10 px-5 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 font-bold gap-2 text-xs"
+            >
               <FileDown className="h-3.5 w-3.5" />
               Export
             </Button>

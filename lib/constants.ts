@@ -12,9 +12,11 @@ export const ROUTES = {
   FOREX: "/forex",
   BANKING: "/banking",
   BLOCKCHAIN: "/blockchain",
+  WALLETS: "/wallets",
   COMPLIANCE: "/compliance",
   NOTIFICATIONS: "/notifications",
   SECURITY: "/security",
+  CASES: "/cases",
   SETTINGS: "/settings",
   REPORTS: "/reports",
 } as const
@@ -29,6 +31,7 @@ export const NAV_GROUPS = {
     title: "Security Center",
     items: [
       { title: "Threat Monitor", href: ROUTES.SECURITY, icon: "ShieldCheck" },
+      { title: "Cases", href: ROUTES.CASES, icon: "FolderKanban" },
       { title: "Compliance", href: ROUTES.COMPLIANCE, icon: "FileCheck" },
     ],
   },
@@ -51,6 +54,7 @@ export const NAV_GROUPS = {
     title: "System & Tools",
     items: [
       { title: "Blockchain", href: ROUTES.BLOCKCHAIN, icon: "Box" },
+      { title: "Active Wallets", href: ROUTES.WALLETS, icon: "Wallet" },
       { title: "Notifications", href: ROUTES.NOTIFICATIONS, icon: "Bell" },
       { title: "Settings", href: ROUTES.SETTINGS, icon: "Settings" },
     ],

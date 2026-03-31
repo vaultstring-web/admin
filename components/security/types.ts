@@ -10,12 +10,15 @@ export type SecurityEventType =
 
 export interface SecurityEvent {
   id: string;
-  event_type: SecurityEventType;
+  // Legacy/DB event type naming. Backend returns `type`, some UIs still expect `event_type`.
+  event_type?: SecurityEventType;
+  type?: string;
   severity: SecuritySeverity;
   user_id?: string;
   user_email?: string; // Enriched
   ip_address?: string;
-  details: Record<string, unknown>;
+  details?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   status: SecurityStatus;
   created_at: string;
   resolved_at?: string;
@@ -67,7 +70,7 @@ export interface RiskUsageMetrics {
 
 export interface BlocklistEntry {
   id: string;
-  type: 'ip' | 'email' | 'device' | 'wallet';
+  type: 'ip' | 'email' | 'device' | 'wallet' | 'user';
   value: string;
   reason: string;
   created_by?: string;

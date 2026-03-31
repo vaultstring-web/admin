@@ -1,7 +1,7 @@
 // app/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CustomerDetail } from '@/components/customers/CustomerDetail';
 import { CustomerList } from '@/components/customers/CustomerList';
 import { KYCStatus, AccountStatus, type Customer } from '@/components/customers/types';
@@ -9,6 +9,7 @@ import { useSession } from '@/hooks/useSession';
 import {
   getUsers,
   getUserById,
+  getUserOverview,
   updateUserStatus,
   updateKYCStatus,
   getUserActivity,
@@ -18,8 +19,13 @@ import {
   type User,
   type AuditLog,
 } from '@/lib/api';
+import { linkOrCreateCaseAndAppendNote } from '@/lib/caseLinking';
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MonitoringLayout } from '@/components/monitoring/MonitoringLayout';
+import { DetailDrawer } from '@/components/monitoring/DetailDrawer';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function UsersPage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -27,12 +33,21 @@ export default function UsersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'directory' | 'detail' | 'insights'>('directory');
 
   // Pagination state
   const [page, setPage] = useState(1);
   const [limit] = useState(50);
   const [total, setTotal] = useState(0);
+
+  const [filterUserType, setFilterUserType] = useState<string>('');
+  const [filterKycStatus, setFilterKycStatus] = useState<string>('');
+
+  const apiFilters = useMemo(() => {
+    return {
+      userType: filterUserType || undefined,
+      kycStatus: filterKycStatus || undefined,
+    };
+  }, [filterUserType, filterKycStatus]);
 
   useEffect(() => {
     if (sessionLoading || !isAuthenticated) {
@@ -63,7 +78,7 @@ export default function UsersPage() {
       
       try {
         const offset = (page - 1) * limit;
-        const response = await getUsers(limit, offset);
+        const response = await getUsers(limit, offset, apiFilters);
         
         if (response.error) {
           setError(response.error);
@@ -118,15 +133,26 @@ export default function UsersPage() {
     };
 
     fetchUsers();
-  }, [sessionLoading, isAuthenticated, page, limit]);
+  }, [sessionLoading, isAuthenticated, page, limit, apiFilters]);
 
   // Find the selected customer or fetch it
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [overview, setOverview] = useState<{
+    user?: User;
+    walletsTotal?: number;
+    transactionsTotal?: number;
+    auditTotal?: number;
+    securityTotal?: number;
+    risk?: Record<string, unknown>;
+  } | null>(null);
 
   useEffect(() => {
     if (!selectedCustomerId) {
       setSelectedCustomer(null);
+      setOverview(null);
+      setDrawerOpen(false);
       return;
     }
 
@@ -195,22 +221,29 @@ export default function UsersPage() {
                 : 0,
             avatarUrl: '/placeholder-user.jpg',
             kycDocuments: [],
-            auditLogs: auditLogs.map((log) => ({
-              id: log.id || `LOG-${Date.now()}`,
-              action: log.action || 'UNKNOWN',
-              adminId: log.user_email || 'SYSTEM',
-              timestamp: log.created_at || new Date().toISOString(),
-              reason:
-                log.action === 'LOGIN_SUCCESS'
-                  ? `Login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}`
-                  : log.action === 'LOGIN_FAILED'
-                  ? `Failed login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}${log.error_message ? ` (${log.error_message})` : ''}`
-                  : log.reason ||
-                    (log.new_values && JSON.stringify(log.new_values)) ||
-                    log.error_message ||
-                    log.request_id ||
-                    '',
-            })),
+            auditLogs: auditLogs.map((log) => {
+              const reasonFromNewValues =
+                log.new_values && typeof log.new_values === 'object' && 'reason' in log.new_values
+                  ? String((log.new_values as Record<string, unknown>).reason || '')
+                  : log.new_values && typeof log.new_values === 'object'
+                  ? JSON.stringify(log.new_values)
+                  : '';
+              return {
+                id: log.id || `LOG-${Date.now()}`,
+                action: log.action || 'UNKNOWN',
+                adminId: log.user_email || 'SYSTEM',
+                timestamp: log.created_at || new Date().toISOString(),
+                reason:
+                  log.action === 'LOGIN_SUCCESS'
+                    ? `Login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}`
+                    : log.action === 'LOGIN_FAILED'
+                    ? `Failed login from ${log.ip_address || 'unknown IP'} via ${log.user_agent || 'unknown device'}${log.error_message ? ` (${log.error_message})` : ''}`
+                    : reasonFromNewValues ||
+                      log.error_message ||
+                      log.request_id ||
+                      '',
+              };
+            }),
             loginAttempts,
             failedLoginAttempts,
             lastLoginAt: lastLogin?.created_at,
@@ -243,6 +276,27 @@ export default function UsersPage() {
     fetchCustomerDetail();
   }, [selectedCustomerId, customers]);
 
+  useEffect(() => {
+    if (!selectedCustomerId) return;
+    setDrawerOpen(true);
+    const load = async () => {
+      const res = await getUserOverview(selectedCustomerId);
+      if (res.data) {
+        setOverview({
+          user: res.data.user,
+          walletsTotal: res.data.wallets?.total,
+          transactionsTotal: res.data.transactions?.total,
+          auditTotal: res.data.audit_logs?.total,
+          securityTotal: res.data.security_events?.total,
+          risk: res.data.risk,
+        });
+      } else {
+        setOverview(null);
+      }
+    };
+    void load();
+  }, [selectedCustomerId]);
+
   // Handle status updates - actually calls backend
   const handleUpdateStatus = async (id: string, newStatus: KYCStatus | AccountStatus, reason?: string) => {
     try {
@@ -263,6 +317,15 @@ export default function UsersPage() {
         toast.error(`Failed to update status: ${response.error}`);
         return;
       }
+
+      const statusLabel = String(newStatus);
+      await linkOrCreateCaseAndAppendNote({
+        entityType: 'user',
+        entityId: id,
+        title: `User status update: ${id}`,
+        note: `Admin updated user status to "${statusLabel}".${reason ? `\n\nReason: ${reason}` : ''}`,
+        priority: 'high',
+      });
 
       // Refresh user data from backend
       const userResponse = await getUserById(id);
@@ -448,7 +511,6 @@ export default function UsersPage() {
       if (selectedCustomerId === id) {
         setSelectedCustomerId(null);
         setSelectedCustomer(null);
-        setActiveTab('directory');
       }
     } catch (err: unknown) {
       console.error('Failed to delete user:', err);
@@ -456,12 +518,6 @@ export default function UsersPage() {
         err instanceof Error ? err.message : 'Unknown error';
       toast.error(`Failed to delete user: ${message}`);
     }
-  };
-
-  // Handle back from detail view
-  const handleBackToList = () => {
-    setSelectedCustomerId(null);
-    setActiveTab('directory');
   };
 
   if (loading && customers.length === 0) {
@@ -476,122 +532,112 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-light-bg dark:bg-neutral-dark-bg text-neutral-light-text dark:text-neutral-dark-text transition-colors">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
-          </div>
-        )}
-
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-6">
-          <TabsList className="inline-flex h-10 items-center justify-center rounded-xl bg-neutral-100/60 dark:bg-neutral-900/60 p-1.5 border border-neutral-light-border/60 dark:border-neutral-dark-border/60">
-            <TabsTrigger
-              value="directory"
-              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-            >
-              Directory
-            </TabsTrigger>
-            <TabsTrigger
-              value="detail"
-              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-            >
-              User detail
-            </TabsTrigger>
-            <TabsTrigger
-              value="insights"
-              className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-white data-[state=active]:text-brand-green data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-            >
-              Insights
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="directory" className="space-y-6">
-            <CustomerList
-              customers={customers}
-              onSelectCustomer={(id) => {
-                setSelectedCustomerId(id);
-                setActiveTab('detail');
-              }}
-              loading={loading}
-              page={page}
-              total={total}
-              limit={limit}
-              onPageChange={setPage}
-            />
-          </TabsContent>
-
-          <TabsContent value="detail" className="space-y-6">
-            {loadingDetail && selectedCustomerId ? (
-              <div className="flex items-center justify-center min-h-[400px]">
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#448a33] mb-4" />
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Loading user details...</p>
-                </div>
-              </div>
-            ) : selectedCustomer ? (
-              <CustomerDetail
-                customer={selectedCustomer}
-                onBack={handleBackToList}
-                onUpdateStatus={handleUpdateStatus}
-                onUpdateRole={handleUpdateRole}
-                onUpdateProfile={handleUpdateProfile}
-                onDelete={handleDeleteUser}
-              />
-            ) : (
-              <div className="flex items-center justify-center min-h-[240px]">
-                <p className="text-sm text-neutral-light-text/80 dark:text-neutral-dark-text/80">
-                  Select a user from the directory tab to view full details.
-                </p>
-              </div>
+    <>
+      <MonitoringLayout
+        title="Users & Accounts"
+        subtitle="Monitor customers like a bank: identity, KYC, risk, balances, and activity."
+        filters={
+          <>
+            {error && (
+              <Card className="border-rose-200 bg-rose-50/60">
+                <CardHeader>
+                  <CardTitle className="text-sm">Error</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-rose-700">{error}</CardContent>
+              </Card>
             )}
-          </TabsContent>
 
-          <TabsContent value="insights" className="space-y-6">
-            <div className="mt-4 pt-4 border-t border-neutral-light-border dark:border-neutral-dark-border">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-                  <div className="text-2xl font-bold text-neutral-light-heading dark:text-neutral-dark-heading">
-                    {total}
-                  </div>
-                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                    Total Customers
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Filters</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="userType">User type</Label>
+                  <Input
+                    id="userType"
+                    placeholder="customer / admin / merchant"
+                    value={filterUserType}
+                    onChange={(e) => {
+                      setFilterUserType(e.target.value);
+                      setPage(1);
+                    }}
+                  />
                 </div>
-                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-                  <div className="text-2xl font-bold text-brand-green">
-                    {customers.filter((c) => c.kycStatus === KYCStatus.APPROVED).length}
-                  </div>
-                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                    KYC Approved
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="kycStatus">KYC status</Label>
+                  <Input
+                    id="kycStatus"
+                    placeholder="pending / verified / rejected"
+                    value={filterKycStatus}
+                    onChange={(e) => {
+                      setFilterKycStatus(e.target.value);
+                      setPage(1);
+                    }}
+                  />
                 </div>
-                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-                  <div className="text-2xl font-bold text-amber-600">
-                    {customers.filter((c) => c.kycStatus === KYCStatus.PENDING).length}
-                  </div>
-                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                    Pending Review
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-neutral-dark-surface p-4 rounded-lg border border-neutral-light-border dark:border-neutral-dark-border shadow-sm">
-                  <div className="text-2xl font-bold text-red-600">
-                    {customers.filter((c) => c.accountStatus === AccountStatus.BLOCKED).length}
-                  </div>
-                  <div className="text-sm text-neutral-light-text dark:text-neutral-dark-text">
-                    Blocked Accounts
-                  </div>
-                </div>
-              </div>
+              </CardContent>
+            </Card>
+          </>
+        }
+      >
+        <CustomerList
+          customers={customers}
+          onSelectCustomer={(id) => {
+            setSelectedCustomerId(id);
+          }}
+          loading={loading}
+          page={page}
+          total={total}
+          limit={limit}
+          onPageChange={setPage}
+        />
+      </MonitoringLayout>
 
-              <div className="mt-8 text-center text-xs text-neutral-light-text dark:text-neutral-dark-text">
-                <p>Compliance Dashboard • Last updated: {new Date().toLocaleDateString()}</p>
-                <p className="mt-1">Showing {customers.length} customers • Auto-refresh every 5 minutes</p>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+      <DetailDrawer
+        open={drawerOpen}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) {
+            setSelectedCustomerId(null);
+          }
+        }}
+        title={overview?.user?.email || 'User overview'}
+        description="User 360: wallets, recent transactions, audit & security timeline."
+        widthClassName="sm:max-w-3xl"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs">Wallets</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm font-mono">{overview?.walletsTotal ?? '—'}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs">Recent transactions</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm font-mono">{overview?.transactionsTotal ?? '—'}</CardContent>
+            </Card>
+          </div>
+
+          {loadingDetail && selectedCustomerId ? (
+            <div className="py-10 text-sm text-muted-foreground">Loading user details…</div>
+          ) : selectedCustomer ? (
+            <CustomerDetail
+              customer={selectedCustomer}
+              onBack={() => setDrawerOpen(false)}
+              onUpdateStatus={handleUpdateStatus}
+              onUpdateRole={handleUpdateRole}
+              onUpdateProfile={handleUpdateProfile}
+              onDelete={handleDeleteUser}
+            />
+          ) : (
+            <div className="py-10 text-sm text-muted-foreground">Select a user to view details.</div>
+          )}
+        </div>
+      </DetailDrawer>
+    </>
   );
 }

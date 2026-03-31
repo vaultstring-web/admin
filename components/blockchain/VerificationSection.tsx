@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Check, AlertTriangle, FileText, Hash, Lock, RefreshCw, Cpu, Fingerprint, ShieldCheck } from 'lucide-react';
+import { Shield, Check, AlertTriangle, FileText, Hash, Lock, RefreshCw, Cpu, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { getWalletAddresses } from '@/lib/api';
 
 export const VerificationSection: React.FC = () => {
   const [onChain, setOnChain] = useState('');
@@ -199,57 +200,238 @@ export const VerificationSection: React.FC = () => {
   );
 };
 
-export const VerificationProtocolPanel: React.FC = () => (
-  <Card className="border border-emerald-100 bg-gradient-to-b from-emerald-50/80 to-white shadow-sm">
-    <CardHeader className="pb-4">
-      <div className="flex items-center gap-3">
-        <div className="bg-emerald-600/10 w-fit p-2 rounded-2xl">
-          <Cpu className="h-5 w-5 text-emerald-700" />
-        </div>
-        <div>
-          <CardTitle className="text-base font-semibold tracking-tight">
-            Verification Protocol
-          </CardTitle>
-          <CardDescription className="text-xs font-medium text-slate-500">
-            High-level view of how hashes and blocks are linked for integrity.
-          </CardDescription>
-        </div>
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-5">
-      <p className="text-xs leading-relaxed text-slate-600">
-        Hyperledger Fabric blocks are linked via SHA-256 hash chains. Every transaction
-        payload is hashed and included in the block&apos;s data commitment so that any
-        tampering is immediately detectable.
-      </p>
-      <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-3">
-        <ProtocolStep icon={Fingerprint} text="SHA-256 Hashing" />
-        <ProtocolStep icon={Lock} text="Merkle Tree Proof" />
-        <ProtocolStep icon={Shield} text="Consensus Validation" />
-      </div>
-      <div className="pt-4 mt-2 border-t border-emerald-100 flex items-center justify-between">
-        <span className="text-[10px] text-emerald-700/70 font-mono font-bold tracking-widest uppercase">
-          Sec-Protocol-v4
-        </span>
-        <div className="flex items-center gap-2 text-[10px] text-emerald-700/80">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live consistency checks
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-);
+export const VerificationProtocolPanel: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<'IDLE' | 'VALID' | 'INVALID'>('IDLE');
+  const [checkedWallet, setCheckedWallet] = useState<string | null>(null);
+  type ChainEntry = {
+    id: string;
+    transaction_id: string;
+    entry_type: string;
+    amount: string;
+    currency: string;
+    balance_after: string;
+    created_at: string;
+    previous_hash: string;
+    hash: string;
+    expected_previous_hash: string;
+    calculated_hash: string;
+    link_ok: boolean;
+    hash_ok: boolean;
+  };
 
-type ProtocolStepProps = {
-  icon: React.ComponentType<{ className?: string }>;
-  text: string;
-};
+  type ChainReport = {
+    wallet_id: string;
+    valid: boolean;
+    count: number;
+    entries: ChainEntry[];
+  };
 
-const ProtocolStep = ({ icon: Icon, text }: ProtocolStepProps) => (
-  <div className="flex items-center gap-3 text-emerald-50 group">
-    <div className="p-1.5 rounded-lg bg-white/10 group-hover:bg-white/20 transition-colors">
-      <Icon className="h-3 w-3 text-white" />
-    </div>
-    <span className="text-[10px] font-bold uppercase tracking-wide">{text}</span>
-  </div>
-);
+  const [entries, setEntries] = useState<ChainEntry[]>([]);
+
+  const handleRunCheck = async () => {
+    setLoading(true);
+    setError(null);
+    setResult('IDLE');
+    setCheckedWallet(null);
+    setEntries([]);
+
+    try {
+      const walletsRes = await getWalletAddresses(1, 0);
+      const firstWallet = walletsRes.data.addresses?.[0];
+      if (!firstWallet || !firstWallet.id) {
+        setError('No wallet records available to verify.');
+        setLoading(false);
+        return;
+      }
+
+      setCheckedWallet(firstWallet.address || firstWallet.wallet_address || firstWallet.id);
+
+      const res = await fetch(`/api/v1/admin/blockchain/wallets/${firstWallet.id}/ledger-chain?limit=50`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        setError('Ledger verification endpoint returned an error.');
+        setLoading(false);
+        return;
+      }
+
+      const data = (await res.json()) as ChainReport;
+      setEntries(Array.isArray(data.entries) ? data.entries : []);
+      setResult(data.valid ? 'VALID' : 'INVALID');
+    } catch {
+      setError('Failed to run ledger verification.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border border-emerald-100 bg-gradient-to-b from-emerald-50/80 to-white shadow-sm">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-600/10 w-fit p-2 rounded-2xl">
+            <Cpu className="h-5 w-5 text-emerald-700" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-semibold tracking-tight">
+              Ledger Verification Protocol
+            </CardTitle>
+            <CardDescription className="text-xs font-medium text-slate-500">
+              Run an on-demand hash-chain integrity check against a real wallet ledger.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-xs leading-relaxed text-slate-600">
+          This check walks the immutable ledger chain for a sample wallet and recomputes each hash
+          to confirm that no historical entry has been tampered with.
+        </p>
+
+        <div className="flex items-center gap-3">
+          <Button
+            disabled={loading}
+            onClick={handleRunCheck}
+            className="h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black tracking-widest uppercase"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Running verification...
+              </>
+            ) : (
+              <>
+                <Shield className="h-4 w-4 mr-2" />
+                Run ledger check
+              </>
+            )}
+          </Button>
+
+          {checkedWallet && (
+            <span className="text-[10px] font-mono text-slate-500 truncate max-w-xs">
+              Wallet: {checkedWallet}
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <Alert className="border-rose-200 bg-rose-50/60">
+            <AlertTitle className="text-xs font-semibold text-rose-700">
+              Verification failed to run
+            </AlertTitle>
+            <AlertDescription className="text-[11px] text-rose-700/80">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {result !== 'IDLE' && !error && (
+          <Alert
+            className={cn(
+              'animate-in fade-in slide-in-from-bottom-2 duration-500 rounded-xl border-2',
+              result === 'VALID'
+                ? 'border-emerald-500/20 bg-emerald-50/60'
+                : 'border-rose-500/20 bg-rose-50/60',
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={cn(
+                  'mt-1 p-1.5 rounded-full',
+                  result === 'VALID' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-rose-500/20 text-rose-600',
+                )}
+              >
+                {result === 'VALID' ? <Check className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              </div>
+              <div>
+                <AlertTitle className="text-xs font-black uppercase tracking-tight mb-1">
+                  {result === 'VALID' ? 'Immutable chain verified' : 'Ledger integrity failure'}
+                </AlertTitle>
+                <AlertDescription className="text-[11px] text-slate-700/90">
+                  {result === 'VALID'
+                    ? 'All historical ledger entries matched their expected hashes. The chain is intact for the sampled wallet.'
+                    : 'A mismatch was detected while walking the hash chain. Investigate recent ledger writes or database mutations.'}
+                </AlertDescription>
+              </div>
+            </div>
+          </Alert>
+        )}
+
+        {entries.length > 0 && (
+          <div className="rounded-xl border border-emerald-100 overflow-hidden">
+            <div className="px-3 py-2 bg-white flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Hash linkage (last {entries.length})
+              </span>
+              <span className="text-[10px] font-mono text-slate-500">
+                Link OK / Hash OK
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead className="bg-emerald-50/60">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">Time</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">Type</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-black uppercase tracking-wider">Amount</th>
+                    <th className="px-3 py-2 text-left text-[10px] font-black uppercase tracking-wider">Prev → Hash</th>
+                    <th className="px-3 py-2 text-right text-[10px] font-black uppercase tracking-wider">OK</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((e) => {
+                    const created = e.created_at ? new Date(e.created_at) : null;
+                    const short = (h: string) => (h ? `${h.slice(0, 8)}…${h.slice(-8)}` : '—');
+                    return (
+                      <tr key={e.id} className="border-t border-emerald-100/60">
+                        <td className="px-3 py-2 text-[11px] text-slate-600">
+                          {created ? created.toLocaleString() : '—'}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-800">
+                          {e.entry_type}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-slate-800">
+                          {e.amount} {e.currency}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-slate-600">
+                          <span className={e.link_ok ? 'text-emerald-700' : 'text-rose-700'}>
+                            {short(e.previous_hash)}
+                          </span>
+                          <span className="text-slate-400"> → </span>
+                          <span className={e.hash_ok ? 'text-emerald-700' : 'text-rose-700'}>
+                            {short(e.hash)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono text-[10px]">
+                          <span className={e.link_ok ? 'text-emerald-700' : 'text-rose-700'}>
+                            {e.link_ok ? 'L✓' : 'L✗'}
+                          </span>{' '}
+                          <span className={e.hash_ok ? 'text-emerald-700' : 'text-rose-700'}>
+                            {e.hash_ok ? 'H✓' : 'H✗'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-4 mt-2 border-t border-emerald-100 flex items-center justify-between">
+          <span className="text-[10px] text-emerald-700/70 font-mono font-bold tracking-widest uppercase">
+            Ledger-Integrity-v1
+          </span>
+          <div className="flex items-center gap-2 text-[10px] text-emerald-700/80">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            On-demand consistency check
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

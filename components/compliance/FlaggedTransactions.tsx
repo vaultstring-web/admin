@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Fingerprint, Clock, ShieldAlert, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface FlaggedTransactionsProps {
   transactions: FlaggedTransaction[];
@@ -57,7 +58,12 @@ export const FlaggedTransactions: React.FC<FlaggedTransactionsProps> = ({
             {pendingTransactions.length} anomalies detected in current cycle
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" className="h-9 border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5"
+          onClick={() => toast.info('Use the Global Audit Log section below to export and review actions.')}
+        >
           Audit Log
         </Button>
       </CardHeader>

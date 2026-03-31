@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { NotificationList } from '@/components/notifications/NotificationList';
 import { NotificationStats } from '@/components/notifications/NotificationStats';
 import { NotificationPreferences } from '@/components/notifications/NotificationPreferences';
-import { getNotifications } from '@/lib/api';
+import { archiveNotification, getNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/api';
 import { Notification, NotificationStatus } from '@/components/notifications/types';
 import { Bell, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,27 +32,48 @@ export default function NotificationsPage() {
   }, []);
 
   const handleMarkAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === id
-          ? { ...notification, status: NotificationStatus.READ, readAt: new Date().toISOString() }
-          : notification
-      )
-    );
+    void (async () => {
+      const res = await markNotificationRead(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === id
+            ? { ...notification, status: NotificationStatus.READ, readAt: new Date().toISOString() }
+            : notification
+        )
+      );
+    })();
   };
 
   const handleMarkAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notification => ({
-        ...notification,
-        status: NotificationStatus.READ,
-        readAt: new Date().toISOString()
-      }))
-    );
+    void (async () => {
+      const res = await markAllNotificationsRead();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setNotifications(prev =>
+        prev.map(notification => ({
+          ...notification,
+          status: NotificationStatus.READ,
+          readAt: new Date().toISOString()
+        }))
+      );
+    })();
   };
 
   const handleDelete = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
+    void (async () => {
+      const res = await archiveNotification(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setNotifications(prev => prev.filter(notification => notification.id !== id));
+    })();
   };
 
   if (loading) {

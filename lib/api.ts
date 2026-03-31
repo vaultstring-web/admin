@@ -229,14 +229,124 @@ export async function getUserById(id: string): Promise<ApiResponse<User>> {
   return apiFetch<User>(`/admin/users/${id}`);
 }
 
+export type UserOverview = {
+  user: User;
+  wallets?: { items: unknown[]; total: number; limit?: number; offset?: number };
+  transactions?: { items: unknown[]; total: number; limit?: number; offset?: number };
+  audit_logs?: { items: unknown[]; total: number; limit?: number; offset?: number };
+  security_events?: { items: unknown[]; total: number; limit?: number; offset?: number };
+  risk?: Record<string, unknown>;
+};
+
+export async function getUserOverview(id: string): Promise<ApiResponse<UserOverview>> {
+  return apiFetch<UserOverview>(`/admin/users/${id}/overview`);
+}
+
+export type CaseStatus = 'open' | 'investigating' | 'resolved' | 'false_positive';
+export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
+export type CaseEntityType = 'user' | 'transaction' | 'wallet' | 'ip';
+
+export type Case = {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: CaseStatus;
+  priority: CasePriority;
+  entity_type: CaseEntityType;
+  entity_id: string;
+  created_by?: string | null;
+  assigned_to?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CaseEvent = {
+  id: string;
+  case_id: string;
+  event_type: 'note' | 'status_change' | 'assignment' | 'link';
+  message?: string | null;
+  metadata?: Record<string, unknown>;
+  created_by?: string | null;
+  created_at: string;
+};
+
+export type CasesFilters = {
+  status?: CaseStatus;
+  priority?: CasePriority;
+  entity_type?: CaseEntityType;
+  entity_id?: string;
+  q?: string;
+};
+
+export async function getCases(limit = 50, offset = 0, filters: CasesFilters = {}): Promise<ApiResponse<{ items: Case[]; total: number; limit: number; offset: number }>> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') params.set(k, String(v));
+  });
+  return apiFetch(`/admin/cases?${params.toString()}`);
+}
+
+export async function createCase(payload: {
+  title: string;
+  description?: string;
+  priority?: CasePriority;
+  entity_type: CaseEntityType;
+  entity_id: string;
+  assigned_to?: string;
+  note?: string;
+}): Promise<ApiResponse<Case>> {
+  return apiFetch(`/admin/cases`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateCase(id: string, payload: Partial<Pick<Case, 'title' | 'description' | 'status' | 'priority'>> & { assigned_to?: string; note?: string }): Promise<ApiResponse<Case>> {
+  return apiFetch(`/admin/cases/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCaseEvents(caseId: string, limit = 50, offset = 0): Promise<ApiResponse<{ items: CaseEvent[]; total: number; limit: number; offset: number }>> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return apiFetch(`/admin/cases/${caseId}/events?${params.toString()}`);
+}
+
 export async function updateUserStatus(
   id: string,
   isActive: boolean,
   reason?: string
 ): Promise<ApiResponse<{ message: string }>> {
-  return apiFetch(`/admin/users/${id}/status`, {
-    method: 'PATCH',
-    body: JSON.stringify({ is_active: isActive, reason }),
+  // Use dedicated block/unblock endpoints for proper audit trail
+  if (isActive) {
+    return unblockUser(id, reason);
+  } else {
+    return blockUser(id, reason);
+  }
+}
+
+export async function blockUser(
+  id: string,
+  reason?: string
+): Promise<ApiResponse<{ status?: string; user_id?: string }>> {
+  return apiFetch(`/admin/users/${id}/block`, {
+    method: 'POST',
+    body: reason ? JSON.stringify({ reason }) : undefined,
+  });
+}
+
+export async function unblockUser(
+  id: string,
+  reason?: string
+): Promise<ApiResponse<{ status?: string; user_id?: string }>> {
+  return apiFetch(`/admin/users/${id}/unblock`, {
+    method: 'POST',
+    body: reason ? JSON.stringify({ reason }) : undefined,
   });
 }
 
@@ -468,6 +578,16 @@ export async function flagTransaction(
   });
 }
 
+export async function reverseTransaction(
+  id: string,
+  reason: string
+): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch(`/admin/transactions/${id}/reverse`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function getWalletTransactions(
   walletId: string,
   limit = 50,
@@ -524,11 +644,28 @@ export async function getPaymentGateways(): Promise<ApiResponse<{ gateways: Paym
 
 export async function getSettlements(
   limit = 50,
-  offset = 0
+  offset = 0,
+  filters: { status?: string; currency?: string; network?: string } = {}
 ): Promise<ApiResponse<{ settlements: Settlement[]; total?: number }>> {
-  return apiFetch<{ settlements: Settlement[]; total?: number }>(
-    `/admin/banking/settlements?limit=${limit}&offset=${offset}`
-  );
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') params.set(k, String(v));
+  });
+  return apiFetch<{ settlements: Settlement[]; total?: number }>(`/admin/banking/settlements?${params.toString()}`);
+}
+
+export async function retrySettlement(id: string): Promise<ApiResponse<{ settlement: Settlement }>> {
+  return apiFetch(`/admin/banking/settlements/${id}/retry`, { method: 'POST' });
+}
+
+export async function reconcileSettlement(id: string, reconciliation_id?: string): Promise<ApiResponse<{ settlement: Settlement }>> {
+  return apiFetch(`/admin/banking/settlements/${id}/reconcile`, {
+    method: 'POST',
+    body: reconciliation_id ? JSON.stringify({ reconciliation_id }) : undefined,
+  });
 }
 
 // ============================================================================
@@ -617,10 +754,18 @@ export async function getBlockchainTransactions(
 
 export async function getWalletAddresses(
   limit = 50,
-  offset = 0
+  offset = 0,
+  filters?: { user_id?: string; currency?: string; q?: string }
 ): Promise<ApiResponse<{ addresses: WalletAddress[]; total?: number }>> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (filters?.user_id) params.set('user_id', filters.user_id);
+  if (filters?.currency) params.set('currency', filters.currency);
+  if (filters?.q) params.set('q', filters.q);
   return apiFetch<{ addresses: WalletAddress[]; total?: number }>(
-    `/admin/blockchain/wallets?limit=${limit}&offset=${offset}`
+    `/admin/blockchain/wallets?${params.toString()}`
   );
 }
 
@@ -747,6 +892,46 @@ export interface Notification {
   readAt?: string;
 }
 
-export async function getNotifications(limit = 50, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; total?: number }>> {
-  return apiFetch<{ notifications: Notification[]; total?: number }>(`/admin/notifications?limit=${limit}&offset=${offset}`);
+type BackendAdminNotification = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+};
+
+export async function getNotifications(
+  limit = 50,
+  offset = 0
+): Promise<ApiResponse<{ notifications: Notification[]; total?: number }>> {
+  const res = await apiFetch<{ notifications: BackendAdminNotification[]; total?: number }>(
+    `/admin/notifications?limit=${limit}&offset=${offset}`
+  );
+  if (!res.data) return res as unknown as ApiResponse<{ notifications: Notification[]; total?: number }>;
+  const mapped: Notification[] = (res.data.notifications || []).map((n) => ({
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: String(n.type || 'system').toLowerCase(),
+    status: n.is_read ? 'read' : 'unread',
+    timestamp: n.created_at,
+    metadata: n.data,
+    userId: n.user_id,
+  }));
+  return { data: { notifications: mapped, total: res.data.total } };
+}
+
+export async function markNotificationRead(id: string): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch(`/admin/notifications/${id}/read`, { method: 'POST' });
+}
+
+export async function markAllNotificationsRead(): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch(`/admin/notifications/read-all`, { method: 'POST' });
+}
+
+export async function archiveNotification(id: string): Promise<ApiResponse<{ message: string }>> {
+  return apiFetch(`/admin/notifications/${id}`, { method: 'DELETE' });
 }

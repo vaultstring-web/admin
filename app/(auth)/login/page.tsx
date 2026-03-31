@@ -363,7 +363,7 @@ function LoginForm() {
             <details className="w-full bg-gradient-to-r from-[#f4fef2] to-[#eafdee] border border-dashed border-[#b9ddb2] rounded-md p-3 px-4 mt-2 text-xs text-gray-700 dark:bg-[#244a1a] dark:from-[#244a1a] dark:to-[#192d16] dark:text-gray-300 cursor-pointer select-none group" open={false}>
               <summary className="font-semibold text-[#448a33] dark:text-[#66b354] focus:outline-none cursor-pointer mb-1">Need default admin credentials?</summary>
               <span className="block font-mono text-[#448a33] dark:text-[#66b354] font-bold">
-                admin@example.com / Password123
+                admin@kyd.com / password123
               </span>
             </details>
           </div>

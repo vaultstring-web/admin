@@ -6,9 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionFilters } from '@/components/transactions/TransactionFilters';
 import { FlagTransactionDialog } from '@/components/transactions/FlagTransactionDialog';
+import { ReverseTransactionDialog } from '@/components/transactions/ReverseTransactionDialog';
 import { TransactionStats } from '@/components/transactions/TransactionStats';
 import { type Transaction } from '@/components/transactions/types';
-import { getTransactions, flagTransaction, type Transaction as ApiTransaction } from '@/lib/api';
+import { createCase, getTransactions, flagTransaction, reverseTransaction, type Transaction as ApiTransaction } from '@/lib/api';
+import { linkOrCreateCaseAndAppendNote } from '@/lib/caseLinking';
 import { useSession } from '@/hooks/useSession';
 import { toast } from "sonner";
 import {
@@ -19,7 +21,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MonitoringLayout } from '@/components/monitoring/MonitoringLayout';
+import { DetailDrawer } from '@/components/monitoring/DetailDrawer';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { downloadCsv } from '@/lib/csv';
 
 type MoneyField = number | string | { amount?: number | string; currency?: string };
 
@@ -46,9 +56,18 @@ export default function TransactionMonitoringPage() {
     currency: 'all',
     type: 'all',
   });
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagReason, setFlagReason] = useState('');
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reversing, setReversing] = useState(false);
+  const [caseOpen, setCaseOpen] = useState(false);
+  const [caseTitle, setCaseTitle] = useState('');
+  const [casePriority, setCasePriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [caseNote, setCaseNote] = useState('');
+  const [creatingCase, setCreatingCase] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,9 +228,10 @@ export default function TransactionMonitoringPage() {
         filters.type === 'all' ||
         (filters.type === 'sent' && (tx.direction === 'sent')) ||
         (filters.type === 'received' && (tx.direction === 'received'));
-      return matchesSearch && matchesStatus && matchesCurrency && matchesType;
+      const matchesFlagged = !flaggedOnly || !!tx.flagged;
+      return matchesSearch && matchesStatus && matchesCurrency && matchesType && matchesFlagged;
     });
-  }, [transactions, filters]);
+  }, [transactions, filters, flaggedOnly]);
 
   const formatAmount = (amount: number) => {
     if (!mounted) return amount.toFixed(2);
@@ -247,6 +267,76 @@ export default function TransactionMonitoringPage() {
     }
   };
 
+  const handleOpenReverse = () => {
+    if (!selectedTx) return;
+    setReverseReason('Customer requested reversal');
+    setReverseOpen(true);
+  };
+
+  const handleOpenCreateCase = () => {
+    if (!selectedTx) return;
+    setCaseTitle(`Transaction review: ${selectedTx.reference ?? selectedTx.id}`);
+    setCasePriority('medium');
+    setCaseNote('');
+    setCaseOpen(true);
+  };
+
+  const handleCreateCaseConfirm = async () => {
+    if (!selectedTx) return;
+    if (!caseTitle.trim()) {
+      toast.error('Case title is required');
+      return;
+    }
+    setCreatingCase(true);
+    try {
+      const res = await createCase({
+        title: caseTitle.trim(),
+        description: `Created from transaction ${selectedTx.id}`,
+        priority: casePriority,
+        entity_type: 'transaction',
+        entity_id: selectedTx.id,
+        note: caseNote.trim() || undefined,
+      });
+      if (res.data?.id) {
+        toast.success('Case created.');
+        setCaseOpen(false);
+      } else {
+        toast.error('Failed to create case');
+      }
+    } catch (err) {
+      console.error('Failed to create case:', err);
+      toast.error('Failed to create case');
+    } finally {
+      setCreatingCase(false);
+    }
+  };
+
+  const handleReverseConfirm = async () => {
+    if (!selectedTx || !reverseReason.trim()) return;
+    setReversing(true);
+    try {
+      await reverseTransaction(selectedTx.id, reverseReason);
+      await linkOrCreateCaseAndAppendNote({
+        entityType: 'transaction',
+        entityId: selectedTx.id,
+        title: `Transaction reversal: ${selectedTx.reference || selectedTx.id}`,
+        note: `Admin reversal executed.\n\nReason: ${reverseReason.trim()}`,
+        priority: 'high',
+      });
+      setTransactions((prev) =>
+        prev.map((t) => (t.id === selectedTx.id ? { ...t, status: 'reversed' } : t))
+      );
+      setSelectedTx((prev) => (prev ? { ...prev, status: 'reversed' } : prev));
+      toast.success('Transaction reversed.');
+      setReverseOpen(false);
+    } catch (err) {
+      console.error('Failed to reverse transaction:', err);
+      toast.error('Failed to reverse transaction');
+    } finally {
+      setReversing(false);
+    }
+  };
+
   const handleClearFilters = () => {
     setFilters({
       search: '',
@@ -254,7 +344,48 @@ export default function TransactionMonitoringPage() {
       currency: 'all',
       type: 'all',
     });
+    setFlaggedOnly(false);
   };
+
+  const exportTransactionsCsv = () => {
+    const rows = filteredTransactions.map((tx) => ({
+      id: tx.id,
+      reference: tx.reference ?? '',
+      status: tx.status,
+      currency: tx.currency,
+      amount: tx.amount,
+      fee: tx.fee,
+      net_amount: tx.netAmount,
+      direction: tx.direction,
+      customer: tx.customer,
+      merchant: tx.merchant,
+      sender_wallet: tx.senderWalletNumber ?? '',
+      receiver_wallet: tx.receiverWalletNumber ?? '',
+      flagged: tx.flagged ? 'true' : 'false',
+      timestamp: tx.timestamp,
+    }))
+
+    downloadCsv(
+      rows,
+      [
+        { key: 'id', header: 'ID' },
+        { key: 'reference', header: 'Reference' },
+        { key: 'status', header: 'Status' },
+        { key: 'currency', header: 'Currency' },
+        { key: 'amount', header: 'Amount' },
+        { key: 'fee', header: 'Fee' },
+        { key: 'net_amount', header: 'Net amount' },
+        { key: 'direction', header: 'Direction' },
+        { key: 'customer', header: 'Customer' },
+        { key: 'merchant', header: 'Merchant' },
+        { key: 'sender_wallet', header: 'Sender wallet' },
+        { key: 'receiver_wallet', header: 'Receiver wallet' },
+        { key: 'flagged', header: 'Flagged' },
+        { key: 'timestamp', header: 'Timestamp' },
+      ],
+      `transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    )
+  }
 
   if (sessionLoading || loading) {
     return (
@@ -276,85 +407,11 @@ export default function TransactionMonitoringPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Transaction Monitoring</h1>
-        <p className="mt-2 text-muted-foreground">
-          Monitor and review transactions for suspicious activity • {transactions.length} total transactions
-        </p>
-      </div>
-
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="inline-flex h-10 items-center justify-center rounded-xl bg-muted/40 p-1.5 border border-border/40">
-          <TabsTrigger
-            value="overview"
-            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-          >
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="filters"
-            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-          >
-            Filters
-          </TabsTrigger>
-          <TabsTrigger
-            value="flagged"
-            className="px-4 sm:px-6 rounded-lg data-[state=active]:bg-background data-[state=active]:text-emerald-600 data-[state=active]:shadow-sm text-xs sm:text-sm font-semibold"
-          >
-            Flagging
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <TransactionStats transactions={filteredTransactions} />
-
-          <TransactionList
-            transactions={filteredTransactions}
-            onSelectTransaction={handleSelectTransaction}
-            onFlagTransaction={handleFlagTransaction}
-            formatAmount={formatAmount}
-          />
-
-          <div className="mt-4">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (page > 1) setPage((p) => p - 1);
-                    }}
-                    className={page === 1 ? 'pointer-events-none opacity-50' : ''}
-                  />
-                </PaginationItem>
-
-                <PaginationItem>
-                  <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
-                    {page}
-                  </PaginationLink>
-                </PaginationItem>
-
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (page * limit < total) setPage((p) => p + 1);
-                    }}
-                    className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-            <div className="text-center text-sm text-muted-foreground mt-2">
-              Showing {Math.min(total, (page - 1) * limit + 1)} to {Math.min(total, page * limit)} of {total} results
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="filters" className="space-y-6">
+    <>
+      <MonitoringLayout
+        title="Transaction Monitoring"
+        subtitle={`Monitor and review transactions for suspicious activity • ${total} total`}
+        filters={
           <TransactionFilters
             search={filters.search}
             status={filters.status}
@@ -365,16 +422,150 @@ export default function TransactionMonitoringPage() {
             onCurrencyChange={(value) => setFilters({ ...filters, currency: value })}
             onTypeChange={(value) => setFilters({ ...filters, type: value })}
             onClearFilters={handleClearFilters}
+            presets={[
+              {
+                id: 'preset-flagged',
+                label: 'Flagged queue',
+                onClick: () => {
+                  setFilters({ search: '', status: 'all', currency: 'all', type: 'all' });
+                  setFlaggedOnly(true);
+                },
+              },
+              {
+                id: 'preset-failed',
+                label: 'Failed',
+                onClick: () => {
+                  setFlaggedOnly(false);
+                  setFilters({ ...filters, status: 'Failed' });
+                },
+              },
+              {
+                id: 'preset-pending',
+                label: 'Pending',
+                onClick: () => {
+                  setFlaggedOnly(false);
+                  setFilters({ ...filters, status: 'Pending' });
+                },
+              },
+              {
+                id: 'preset-reversed',
+                label: 'Reversed',
+                onClick: () => {
+                  setFlaggedOnly(false);
+                  setFilters({ ...filters, search: 'reversed' });
+                },
+              },
+            ]}
           />
-        </TabsContent>
+        }
+      >
+        <div className="flex items-center justify-between gap-2">
+          <TransactionStats transactions={filteredTransactions} />
+          <Button variant="outline" size="sm" onClick={exportTransactionsCsv} disabled={filteredTransactions.length === 0}>
+            Export CSV
+          </Button>
+        </div>
 
-        <TabsContent value="flagged" className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Select a transaction from the overview tab to flag it for compliance review. Use the dialog
-            below to record why the transaction is suspicious.
-          </p>
-        </TabsContent>
-      </Tabs>
+        <TransactionList
+          transactions={filteredTransactions}
+          onSelectTransaction={handleSelectTransaction}
+          onFlagTransaction={handleFlagTransaction}
+          formatAmount={formatAmount}
+        />
+
+        <div className="mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page > 1) setPage((p) => p - 1);
+                  }}
+                  className={page === 1 ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+
+              <PaginationItem>
+                <PaginationLink href="#" onClick={(e) => e.preventDefault()} isActive>
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (page * limit < total) setPage((p) => p + 1);
+                  }}
+                  className={page * limit >= total ? 'pointer-events-none opacity-50' : ''}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <div className="text-center text-sm text-muted-foreground mt-2">
+            Showing {Math.min(total, (page - 1) * limit + 1)} to {Math.min(total, page * limit)} of {total}{' '}
+            results
+          </div>
+        </div>
+      </MonitoringLayout>
+
+      <DetailDrawer
+        open={!!selectedTx}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTx(null);
+        }}
+        title={selectedTx?.reference ? `Transaction ${selectedTx.reference}` : 'Transaction detail'}
+        description="Compliance detail view with quick actions."
+        widthClassName="sm:max-w-2xl"
+      >
+        {selectedTx ? (
+          <div className="space-y-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs">Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <span className="font-mono">{selectedTx.status}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-mono">{selectedTx.amount}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Currency</span>
+                  <span className="font-mono">{selectedTx.currency}</span>
+                </div>
+                <div className="pt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={String(selectedTx.status).toLowerCase() === 'reversed'}
+                    onClick={handleOpenReverse}
+                  >
+                    Reverse transaction
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleOpenCreateCase}>
+                    Create case
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs">Raw payload</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-xs whitespace-pre-wrap wrap-break-word">{JSON.stringify(selectedTx, null, 2)}</pre>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+      </DetailDrawer>
 
       <FlagTransactionDialog
         open={flagOpen}
@@ -384,6 +575,68 @@ export default function TransactionMonitoringPage() {
         onReasonChange={setFlagReason}
         onFlag={handleFlagConfirm}
       />
-    </div>
+
+      <ReverseTransactionDialog
+        open={reverseOpen}
+        onOpenChange={setReverseOpen}
+        transaction={selectedTx}
+        reason={reverseReason}
+        onReasonChange={setReverseReason}
+        onReverse={handleReverseConfirm}
+        isReversing={reversing}
+      />
+
+      <Dialog open={caseOpen} onOpenChange={setCaseOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Create case</DialogTitle>
+            <DialogDescription>
+              Create an investigation case linked to this transaction for bank-style support workflows.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="caseTitle">Title</Label>
+              <Input
+                id="caseTitle"
+                value={caseTitle}
+                onChange={(e) => setCaseTitle(e.target.value)}
+                placeholder="Case title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="casePriority">Priority</Label>
+              <Input
+                id="casePriority"
+                value={casePriority}
+                onChange={(e) => setCasePriority(e.target.value as typeof casePriority)}
+                placeholder="low / medium / high / critical"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="caseNote">Initial note (optional)</Label>
+              <Textarea
+                id="caseNote"
+                value={caseNote}
+                onChange={(e) => setCaseNote(e.target.value)}
+                placeholder="e.g., Customer claims wrong recipient; requested reversal; verify receiver balance + settlement status."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCaseOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateCaseConfirm} disabled={creatingCase || !caseTitle.trim()}>
+              Create case
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

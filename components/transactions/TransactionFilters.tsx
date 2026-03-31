@@ -15,6 +15,7 @@ interface TransactionFiltersProps {
   onCurrencyChange: (value: string) => void;
   onTypeChange?: (value: string) => void;
   onClearFilters: () => void;
+  presets?: { id: string; label: string; onClick: () => void }[];
 }
 
 export function TransactionFilters({
@@ -26,7 +27,8 @@ export function TransactionFilters({
   onStatusChange,
   onCurrencyChange,
   onTypeChange,
-  onClearFilters
+  onClearFilters,
+  presets = [],
 }: TransactionFiltersProps) {
   return (
     <Card className="mb-6 p-4 bg-white dark:bg-[#1e293b]">
@@ -80,6 +82,16 @@ export function TransactionFilters({
           Clear Filters
         </Button>
       </div>
+
+      {presets.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {presets.map((p) => (
+            <Button key={p.id} variant="secondary" size="sm" onClick={p.onClick}>
+              {p.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
     </Card>
   );
 }

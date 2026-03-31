@@ -1,9 +1,25 @@
 import { apiFetch } from '@/lib/api';
 import { SecurityEvent, BlocklistEntry, SystemHealthMetric, RiskConfig, RiskStatus, RiskUsageMetrics } from '@/components/security/types';
 
+export type SecurityEventsFilters = {
+  type?: string;
+  severity?: string;
+  status?: string;
+  user_id?: string;
+  ip?: string;
+  q?: string;
+};
+
 export const SecurityService = {
-  getEvents: async (limit = 10, offset = 0) => {
-    return apiFetch<{ events: SecurityEvent[], total: number }>(`/admin/security/events?limit=${limit}&offset=${offset}`);
+  getEvents: async (limit = 10, offset = 0, filters: SecurityEventsFilters = {}) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && String(v).trim() !== '') params.set(k, String(v));
+    });
+    return apiFetch<{ events: SecurityEvent[], total: number }>(`/admin/security/events?${params.toString()}`);
   },
   
   updateEventStatus: async (id: string, status: string) => {

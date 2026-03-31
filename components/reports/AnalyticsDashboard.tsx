@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,15 +9,45 @@ import {
   FileBarChart, DatabaseZap
 } from 'lucide-react';
 import type { SystemMetrics, EarningsReport, TransactionVolume } from '@/lib/api';
-import { TransactionVolumeChart } from './TransactionVolumeChart';
-import { UserGrowthByRegion } from './UserGrowthByRegion';
-import { RevenueFromFees } from './RevenueFromFees';
-import { TopMerchantsChart } from './TopMerchantsChart';
-import { CurrencySpreadAnalysis } from './CurrencyConversionSpreadAnalysis';
-import { CustomReportBuilder } from './CustomReportBuilder';
-import { AnalyticsSummary } from './AnalyticsSummary';
-import { DataExportPanel } from './DataExportPanel';
 import { Badge } from '../ui/badge';
+
+// Lazy load heavy chart components
+const TransactionVolumeChart = dynamic(() => import('./TransactionVolumeChart').then(mod => mod.TransactionVolumeChart), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const UserGrowthByRegion = dynamic(() => import('./UserGrowthByRegion').then(mod => mod.UserGrowthByRegion), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const RevenueFromFees = dynamic(() => import('./RevenueFromFees').then(mod => mod.RevenueFromFees), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const TopMerchantsChart = dynamic(() => import('./TopMerchantsChart').then(mod => mod.TopMerchantsChart), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const CurrencySpreadAnalysis = dynamic(() => import('./CurrencyConversionSpreadAnalysis').then(mod => mod.CurrencySpreadAnalysis), { 
+  ssr: false,
+  loading: () => <div className="h-[400px] w-full animate-pulse bg-muted/20 rounded-2xl" />
+});
+
+const CustomReportBuilder = dynamic(() => import('./CustomReportBuilder').then(mod => mod.CustomReportBuilder), { 
+  ssr: false 
+});
+
+const AnalyticsSummary = dynamic(() => import('./AnalyticsSummary').then(mod => mod.AnalyticsSummary), { 
+  ssr: true // Summary is important for SEO/Initial load
+});
+
+const DataExportPanel = dynamic(() => import('./DataExportPanel').then(mod => mod.DataExportPanel), { 
+  ssr: false 
+});
 
 interface AnalyticsDashboardProps {
   metrics?: SystemMetrics;

@@ -10,6 +10,7 @@ import {
   ArrowLeftRight,
   DollarSign,
   Building2,
+  Wallet,
   Box,
   Bell,
   Settings,
@@ -18,7 +19,8 @@ import {
   HelpCircle,
   ChevronRight,
   CircleDot,
-  FileCheck
+  FileCheck,
+  FolderKanban
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { NAV_GROUPS } from "@/lib/constants"
@@ -31,6 +33,7 @@ const iconMap = {
   ArrowLeftRight,
   DollarSign,
   Building2,
+  Wallet,
   Box,
   Bell,
   Settings,
@@ -38,6 +41,7 @@ const iconMap = {
   BarChart3,
   HelpCircle,
   FileCheck,
+  FolderKanban,
 }
 
 export function Sidebar() {

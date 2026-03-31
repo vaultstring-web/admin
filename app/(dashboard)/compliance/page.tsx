@@ -42,6 +42,7 @@ import {
 } from '@/components/compliance/types';
 import { safeDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { downloadCsv } from '@/lib/csv';
 
 export default function CompliancePage() {
   const { isAuthenticated, isLoading: sessionLoading } = useSession();
@@ -378,7 +379,46 @@ export default function CompliancePage() {
           <h3 className="text-lg font-semibold px-1">Global Audit Log</h3>
           <AuditLogTable
             logs={auditLogs}
-            onExport={(s, e) => console.log('Export:', s, e)}
+            onExport={(startDate, endDate) => {
+              const start = startDate ? new Date(startDate) : null;
+              const end = endDate ? new Date(endDate) : null;
+              const rows = auditLogs
+                .filter((l) => {
+                  const t = new Date(l.timestamp);
+                  if (start && t < start) return false;
+                  if (end) {
+                    // include full end date
+                    const eod = new Date(end);
+                    eod.setHours(23, 59, 59, 999);
+                    if (t > eod) return false;
+                  }
+                  return true;
+                })
+                .map((l) => ({
+                  id: l.id,
+                  action: l.action,
+                  resource_type: l.resourceType,
+                  resource_id: l.resourceId,
+                  user_email: l.userEmail,
+                  ip_address: l.ipAddress,
+                  timestamp: l.timestamp,
+                }));
+
+              downloadCsv(
+                rows,
+                [
+                  { key: 'id', header: 'ID' },
+                  { key: 'action', header: 'Action' },
+                  { key: 'resource_type', header: 'Entity type' },
+                  { key: 'resource_id', header: 'Entity ID' },
+                  { key: 'user_email', header: 'Actor email' },
+                  { key: 'ip_address', header: 'IP address' },
+                  { key: 'timestamp', header: 'Timestamp' },
+                ],
+                `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+              );
+              toast.success('Audit log exported.');
+            }}
           />
         </section>
 
@@ -386,8 +426,17 @@ export default function CompliancePage() {
           <h3 className="text-lg font-semibold px-1">Compliance Reporting</h3>
           <ComplianceReports
             reports={complianceReports}
-            onGenerate={(type) => console.log('Generate:', type)}
-            onDownload={(id) => console.log('Download:', id)}
+            onGenerate={(type) => {
+              toast.info(`Report generation queued: ${type}`);
+            }}
+            onDownload={(id) => {
+              const report = complianceReports.find((r) => r.id === id);
+              if (report?.downloadUrl) {
+                window.open(report.downloadUrl, '_blank', 'noopener,noreferrer');
+              } else {
+                toast.error('No download URL available for this report.');
+              }
+            }}
           />
         </section>
       </div>

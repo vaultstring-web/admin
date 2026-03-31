@@ -14,6 +14,7 @@ import { MoreHorizontal, ShieldAlert, Search } from "lucide-react"
 import { SecurityEvent } from "./types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { downloadCsv } from "@/lib/csv"
 import {
   Pagination,
   PaginationContent,
@@ -22,6 +23,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface SecurityEventsTableProps {
   events: SecurityEvent[]
@@ -29,6 +38,12 @@ interface SecurityEventsTableProps {
   total?: number
   limit?: number
   onPageChange?: (page: number) => void
+  search?: string
+  onSearchChange?: (value: string) => void
+  onUpdateStatus?: (eventId: string, status: string) => void
+  onBlock?: (type: 'ip' | 'user', value: string, reason: string) => void
+  onSelectTarget?: (target: { ip?: string; user_id?: string }) => void
+  onCreateCase?: (event: SecurityEvent) => void
 }
 
 type SeverityVariant = 'destructive' | 'secondary' | 'outline'
@@ -38,7 +53,13 @@ export function SecurityEventsTable({
   page = 1,
   total = 0,
   limit = 10,
-  onPageChange
+  onPageChange,
+  search = '',
+  onSearchChange,
+  onUpdateStatus,
+  onBlock,
+  onSelectTarget,
+  onCreateCase
 }: SecurityEventsTableProps) {
   const getSeverityColor = (severity: string): SeverityVariant => {
     switch (severity) {
@@ -50,7 +71,41 @@ export function SecurityEventsTable({
     }
   }
 
+  const getEventType = (event: SecurityEvent) => (event.event_type || event.type || 'unknown') as string
+  const getIPAddress = (event: SecurityEvent) => (event.ip_address || '') as string
+  const getUserID = (event: SecurityEvent) => (event.user_id || '') as string
+
   const totalPages = Math.ceil(total / limit)
+
+  const exportCsv = () => {
+    const rows = events.map((event) => {
+      const eventType = getEventType(event)
+      return {
+        id: event.id,
+        event_type: eventType,
+        severity: event.severity,
+        status: event.status,
+        user_id: getUserID(event),
+        user_email: event.user_email || '',
+        ip_address: getIPAddress(event),
+        created_at: event.created_at,
+      }
+    })
+    downloadCsv(
+      rows,
+      [
+        { key: "id", header: "ID" },
+        { key: "event_type", header: "Event type" },
+        { key: "severity", header: "Severity" },
+        { key: "status", header: "Status" },
+        { key: "user_id", header: "User ID" },
+        { key: "user_email", header: "User email" },
+        { key: "ip_address", header: "IP address" },
+        { key: "created_at", header: "Created at" },
+      ],
+      `security-events-${new Date().toISOString().slice(0, 10)}.csv`
+    )
+  }
 
   return (
     <Card>
@@ -65,9 +120,14 @@ export function SecurityEventsTable({
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search events..." className="pl-8 w-[250px]" />
+              <Input
+                placeholder="Search events..."
+                className="pl-8 w-[250px]"
+                value={search}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+              />
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportCsv} disabled={events.length === 0}>
               Export
             </Button>
           </div>
@@ -99,7 +159,7 @@ export function SecurityEventsTable({
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-                        {event.event_type.replace(/_/g, ' ').toUpperCase()}
+                        {getEventType(event).replace(/_/g, ' ').toUpperCase()}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -109,8 +169,24 @@ export function SecurityEventsTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="text-sm">{event.user_email || 'Unknown User'}</span>
-                        <span className="text-xs text-muted-foreground">{event.ip_address}</span>
+                        <button
+                          type="button"
+                          className="text-left text-sm hover:underline disabled:no-underline disabled:opacity-60"
+                          disabled={!getUserID(event)}
+                          onClick={() => onSelectTarget?.({ user_id: getUserID(event) })}
+                          title={getUserID(event) ? `Filter by user ${getUserID(event)}` : undefined}
+                        >
+                          {event.user_email || 'Unknown User'}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-left text-xs text-muted-foreground hover:underline disabled:no-underline disabled:opacity-60"
+                          disabled={!getIPAddress(event)}
+                          onClick={() => onSelectTarget?.({ ip: getIPAddress(event) })}
+                          title={getIPAddress(event) ? `Filter by IP ${getIPAddress(event)}` : undefined}
+                        >
+                          {getIPAddress(event) || '—'}
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -122,9 +198,48 @@ export function SecurityEventsTable({
                       {new Date(event.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>Quick actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => onUpdateStatus?.(event.id, 'investigating')}>
+                            Mark investigating
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onUpdateStatus?.(event.id, 'resolved')}>
+                            Mark resolved
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onUpdateStatus?.(event.id, 'false_positive')}>
+                            Mark false positive
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => onCreateCase?.(event)}>
+                            Create case
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const ip = getIPAddress(event)
+                              if (ip) onBlock?.('ip', ip, `blocked from event ${event.id}`)
+                            }}
+                            disabled={!getIPAddress(event)}
+                          >
+                            Block IP
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const userId = getUserID(event)
+                              if (userId) onBlock?.('user', userId, `blocked from event ${event.id}`)
+                            }}
+                            disabled={!getUserID(event)}
+                          >
+                            Block user
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

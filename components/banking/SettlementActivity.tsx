@@ -26,6 +26,8 @@ interface SettlementActivityProps {
   limit?: number;
   onPageChange?: (page: number) => void;
   rates?: Record<string, number>;
+  onRetryBatch?: (id: string) => void;
+  onReconcileBatch?: (id: string) => void;
 }
 
 export const SettlementActivity: React.FC<SettlementActivityProps> = ({ 
@@ -34,7 +36,9 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
   total = 0,
   limit = 10,
   onPageChange,
-  rates = {}
+  rates = {},
+  onRetryBatch,
+  onReconcileBatch
 }) => {
   const [currency, setCurrency] = useState<'MWK' | 'CNY' | 'ZMW'>('MWK');
 
@@ -245,9 +249,29 @@ export const SettlementActivity: React.FC<SettlementActivityProps> = ({
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600">
-                          <Download className="h-3.5 w-3.5" />
-                        </Button>
+                        {batch.status === 'Failed' && onRetryBatch ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-[10px] font-bold"
+                            onClick={() => onRetryBatch(batch.id)}
+                          >
+                            Retry
+                          </Button>
+                        ) : batch.status === 'Completed' && onReconcileBatch ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 text-[10px] font-bold"
+                            onClick={() => onReconcileBatch(batch.id)}
+                          >
+                            Reconcile
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-emerald-600">
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
